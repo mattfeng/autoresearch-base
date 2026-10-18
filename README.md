@@ -26,7 +26,7 @@ my-project/
     │   └── firewall-allowlist.txt # Hosts resolved at container startup
     ├── results/               # Experiment outputs within the writable workspace
     ├── AGENTS.md              # Experiment instructions
-    ├── .autoresearch.json     # Saved explicit read-only selections
+    ├── .autoresearch.json     # Saved read-only selections and GPU choice
     └── README.md
 ```
 
@@ -99,11 +99,12 @@ collapse. Selections outside the workspace's parent are supported, but shift
 the common ancestor used for `/project` targets: review the displayed mapping.
 Selecting nothing leaves `/project` empty.
 
-Successful generation saves canonical, workspace-relative selections in
-`.autoresearch.json`, keeping sibling paths portable when the tree moves.
-To bypass the picker, repeat `--read-only PATH`; relative paths are resolved
-against the **workspace**, not the shell's working directory, and override the
-saved list:
+Successful generation saves canonical, workspace-relative selections as
+`read_only` and the boolean GPU choice as `gpus` in `.autoresearch.json`,
+keeping sibling paths portable when the tree moves.
+To bypass only the source picker, repeat `--read-only PATH`; relative paths are
+resolved against the **workspace**, not the shell's working directory, and
+override the saved list:
 
 ```bash
 configure-autoresearch --workspace /host/project/math-experiments \
@@ -111,12 +112,23 @@ configure-autoresearch --workspace /host/project/math-experiments \
 configure-autoresearch --workspace /host/project/math-experiments --non-interactive
 ```
 
-`--non-interactive` uses saved selections and requires a saved configuration
-unless explicit `--read-only` choices are supplied. Cancellation writes nothing;
-no setup files or selections are written until successful generation.
-`--dry-run` previews without writing, including settings. Rerunning preserves
-matching generated files and refuses to overwrite changed generated files
-without `--force`; this also applies when changing saved selections.
+Interactive setup also asks **“Give the devcontainer access to all NVIDIA GPUs?”**
+with a yes/no choice. The default is off for a new configuration or older settings
+without `gpus`, and the saved choice on reruns. `--gpus` enables access and
+`--no-gpus` disables it; either skips the GPU prompt. `--read-only` alone does
+not skip that prompt.
+
+`--non-interactive` skips both prompts, reuses saved selections and the saved GPU
+choice (missing `gpus` means false), and requires a saved configuration unless
+explicit `--read-only` choices are supplied. With explicit source choices and no
+saved configuration, GPU access defaults off. `--gpus` or `--no-gpus` overrides
+the saved/default GPU choice in either mode.
+
+Cancellation or EOF before generation writes nothing; no setup files or choices
+are written until successful generation. `--dry-run` previews without writing,
+including settings. Rerunning preserves matching generated files and refuses to
+overwrite changed generated files without `--force`; review changes before
+forcing replacement, including changes to source selections or GPU access.
 
 Regeneration removes obsolete `run-pi.sh`, `experiments/run.sh`,
 `.pi/extensions/research-tools.ts`, and `.pi/extensions/experiments.ts` only
@@ -239,7 +251,19 @@ and can use allowed network services, read Pi's persistent credentials, modify
 workspace files on the host, or write to container-private storage.
 This protects selected source mounts, not the workspace, and is not a hostile-code
 sandbox. Do not expose sensitive credentials to commands.
-GPU access is not enabled.
+
+### Optional NVIDIA GPU access
+
+GPU access is off by default. Enabling it adds Docker's `--gpus=all` runtime
+argument to the existing devcontainer; disabling it omits that argument.
+This is Linux/Docker NVIDIA GPU passthrough, not Apple Metal or macOS GPU support.
+The Docker host needs compatible NVIDIA GPUs, drivers, and the NVIDIA Container
+Toolkit. Setup does not detect GPUs or install drivers, the toolkit, or CUDA.
+Scientific workloads may also need user-provided CUDA-enabled runtime dependencies.
+After regenerating with a different GPU choice, recreate the devcontainer to apply
+the changed runtime arguments; restarting the existing container is not enough.
+When enabled, optionally run `nvidia-smi` inside the recreated container to inspect
+GPU visibility.
 
 ## Outbound firewall
 

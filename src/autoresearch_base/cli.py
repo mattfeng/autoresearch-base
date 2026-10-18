@@ -28,6 +28,35 @@ def load_read_only_paths(workspace: Path) -> tuple[Path, ...] | None:
     return tuple((workspace / Path(path).expanduser()).resolve() for path in value["read_only"])
 
 
+def _load_gpu_access(workspace: Path) -> bool:
+    configuration = workspace / ".autoresearch.json"
+    if not configuration.exists():
+        return False
+    try:
+        value = json.loads(configuration.read_text(encoding="utf-8"))
+    except (ValueError, OSError) as error:
+        raise ConfigurationError(f"Cannot read saved configuration {configuration}: {error}") from error
+    if not isinstance(value, dict) or not isinstance(value.get("gpus", False), bool):
+        raise ConfigurationError(f"Expected a boolean 'gpus' value in {configuration}")
+    return value.get("gpus", False)
+
+
+def _prompt_gpu_access(default: bool) -> bool:
+    choices = "[Y/n]" if default else "[y/N]"
+    while True:
+        try:
+            answer = input(f"Give the devcontainer access to all NVIDIA GPUs? {choices} ").strip().lower()
+        except (EOFError, KeyboardInterrupt) as error:
+            raise SelectionCancelled from error
+        if answer in {"cancel", "quit", "q"}:
+            raise SelectionCancelled
+        if not answer:
+            return default
+        if answer in {"y", "yes", "n", "no"}:
+            return answer in {"y", "yes"}
+        print("Enter yes or no, or cancel to leave without writing files.")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="configure-autoresearch",
@@ -54,6 +83,12 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="reuse saved .autoresearch.json selections without prompting",
     )
+    parser.add_argument(
+        "--gpus",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="enable/disable all NVIDIA GPUs; otherwise prompt or reuse the saved choice",
+    )
     parser.add_argument("--force", action="store_true", help="replace changed generated files")
     parser.add_argument("--dry-run", action="store_true", help="show planned files without writing")
     args = parser.parse_args(argv)
@@ -78,8 +113,15 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  {mount.source} -> {mount.target}")
         if not mounts:
             print("  None (the experiment workspace is mounted read/write)")
+        if args.gpus is not None:
+            gpus = args.gpus
+        else:
+            gpus = _load_gpu_access(workspace)
+            if not args.non_interactive:
+                gpus = _prompt_gpu_access(gpus)
+        print(f"NVIDIA GPU access: {'enabled (--gpus=all)' if gpus else 'disabled'}")
         result = generate(
-            workspace, read_only_paths=selected, force=args.force, dry_run=args.dry_run,
+            workspace, read_only_paths=selected, gpus=gpus, force=args.force, dry_run=args.dry_run,
         )
     except SelectionCancelled:
         print("\nSetup cancelled; no files written.")

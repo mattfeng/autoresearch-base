@@ -153,6 +153,7 @@ def generate(
     workspace: Path,
     *,
     read_only_paths: Sequence[Path] = (),
+    gpus: bool = False,
     force: bool = False,
     dry_run: bool = False,
 ) -> GenerationResult:
@@ -165,8 +166,9 @@ def generate(
         "workspace_name": workspace.name,
         "volume_name": f"autoresearch-pi-{volume_suffix}",
         "read_only_mounts": read_only_mounts,
+        "gpus": gpus,
         "settings_json": json.dumps(
-            {"read_only": [mount.relative_source for mount in read_only_mounts]},
+            {"read_only": [mount.relative_source for mount in read_only_mounts], "gpus": gpus},
             ensure_ascii=False,
             indent=2,
         ),
