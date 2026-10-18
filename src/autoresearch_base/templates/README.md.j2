@@ -81,7 +81,7 @@ to remove it.
 
 `TRACKIO_DIR` defaults to `/workspace/{{ workspace_name }}/trackio` for container
 sessions and Pi-launched experiments. If Trackio is installed, local project
-databases are saved in the workspace's `trackio/` subdirectory, shared across runs.
+data is saved in the workspace's `trackio/` subdirectory, shared across runs.
 The dashboard uses the same default. An explicit `TRACKIO_DIR` override is
 preserved; Trackio is not installed by this generator.
 
@@ -204,6 +204,8 @@ The Dockerfile and devcontainer configuration supply shared defaults:
 | Variable | Default |
 |---|---|
 | `TRACKIO_DIR` | `/workspace/{{ workspace_name }}/trackio` |
+| `TRACKIO_STORAGE_MODE` | `jsonl` |
+| `TRACKIO_SQLITE_MMAP_SIZE` | `0` |
 | `XDG_CACHE_HOME` | `/workspace/{{ workspace_name }}/results/.cache` |
 | `UV_CACHE_DIR` | `/workspace/{{ workspace_name }}/results/.cache/uv` |
 | `UV_PROJECT_ENVIRONMENT` | `/tmp/{{ workspace_name }}/.venv` |

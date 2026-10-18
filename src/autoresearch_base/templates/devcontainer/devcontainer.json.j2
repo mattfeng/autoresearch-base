@@ -31,6 +31,8 @@
     "PYTHONPATH": "/project:/project/src",
     "PYTHONDONTWRITEBYTECODE": "1",
     "TRACKIO_DIR": {{ ("/workspace/" ~ workspace_name ~ "/trackio") | tojson }},
+    "TRACKIO_STORAGE_MODE": "jsonl",
+    "TRACKIO_SQLITE_MMAP_SIZE": "0",
     "XDG_CACHE_HOME": {{ ("/workspace/" ~ workspace_name ~ "/results/.cache") | tojson }},
     "UV_CACHE_DIR": {{ ("/workspace/" ~ workspace_name ~ "/results/.cache/uv") | tojson }},
     "JAX_COMPILATION_CACHE_DIR": {{ ("/workspace/" ~ workspace_name ~ "/results/.cache/jax") | tojson }},

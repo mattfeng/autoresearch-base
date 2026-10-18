@@ -13,6 +13,7 @@
   run directories, logs, metadata, and rankings are not generated automatically.
 - Container configuration supplies shared defaults:
   `TRACKIO_DIR=/workspace/{{ workspace_name }}/trackio`,
+  `TRACKIO_STORAGE_MODE=jsonl`, `TRACKIO_SQLITE_MMAP_SIZE=0`,
   `XDG_CACHE_HOME=/workspace/{{ workspace_name }}/results/.cache`,
   `UV_CACHE_DIR=/workspace/{{ workspace_name }}/results/.cache/uv`,
   `UV_PROJECT_ENVIRONMENT=/tmp/{{ workspace_name }}/.venv`,

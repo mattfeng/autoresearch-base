@@ -200,9 +200,10 @@ does not prevent writes through `/workspace/autoresearch`.
 
 `TRACKIO_DIR` defaults to `/workspace/<workspace-folder-name>/trackio`, including for
 Pi-launched experiments. For `--workspace experiments/`, Trackio stores local
-project databases in `/workspace/experiments/trackio`, shared across runs.
+project data in `/workspace/experiments/trackio`, shared across runs.
 Launch the dashboard in the same container to use that default. An explicit
 `TRACKIO_DIR` override is preserved. Trackio must be installed in your runtime.
+The container sets `TRACKIO_STORAGE_MODE=jsonl` and `TRACKIO_SQLITE_MMAP_SIZE=0`.
 
 Run `pi` directly from `/workspace/autoresearch`. Pi's default tools are
 `read`, `bash`, `edit`, and `write`; Bash executes ordinary shell commands with
