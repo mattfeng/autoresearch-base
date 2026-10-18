@@ -3,7 +3,8 @@
 FROM node:24-bookworm
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates git python3 python3-venv python3-pip ripgrep jq bash \
+    ca-certificates curl git python3 python3-venv python3-pip ripgrep jq bash \
+    iptables util-linux \
     && rm -rf /var/lib/apt/lists/*
 
 # Provide uv without writing to the project's bind-mounted files.
@@ -15,10 +16,15 @@ ENV PATH="/opt/uv/bin:${PATH}"
 # Pi runs as the unprivileged node user.
 RUN npm install --global @earendil-works/pi-coding-agent
 
+# Startup policy and its allowlist are immutable to the unprivileged agent.
+COPY --chown=0:0 init-firewall.py firewall-allowlist.txt entrypoint.sh /usr/local/lib/autoresearch/
+RUN chmod 0755 /usr/local/lib/autoresearch \
+    && chmod 0444 /usr/local/lib/autoresearch/*
+
 RUN mkdir -p /workspace/{{ workspace_name }} /project /results /home/node/.pi \
     && chown -R node:node /workspace /results /home/node/.pi
 
-USER node
+USER root
 WORKDIR /workspace/{{ workspace_name }}
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -27,3 +33,6 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     UV_CACHE_DIR=/results/.cache/uv \
     UV_PROJECT_ENVIRONMENT=/results/.venv \
     TMPDIR=/tmp
+
+ENTRYPOINT ["/bin/bash", "-p", "/usr/local/lib/autoresearch/entrypoint.sh"]
+CMD ["sleep", "infinity"]

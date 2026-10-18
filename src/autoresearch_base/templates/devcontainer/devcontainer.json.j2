@@ -4,6 +4,7 @@
     "dockerfile": "Dockerfile"
   },
   "remoteUser": "node",
+  "overrideCommand": false,
   "updateRemoteUserUID": true,
   "workspaceFolder": "/workspace/{{ workspace_name }}",
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspace/{{ workspace_name }},type=bind,readonly",
@@ -21,6 +22,10 @@
   },
   "runArgs": [
     "--cap-drop=ALL",
+    "--cap-add=NET_ADMIN",
+    "--cap-add=SETUID",
+    "--cap-add=SETGID",
+    "--cap-add=SETPCAP",
     "--security-opt=no-new-privileges",
     "--pids-limit=512"
   ]

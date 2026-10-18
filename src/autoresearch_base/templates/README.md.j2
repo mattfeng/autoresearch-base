@@ -18,8 +18,9 @@ Visual Studio Code window. Choose **Dev Containers: Reopen in Container**.
 the host and writable through `/results`, even though `/project` is read-only.
 Do not place source code inside `results/` and treat experiment outputs as
 untrusted. No container is a security boundary against its host's kernel or
-against a privileged Docker socket; this image deliberately omits elevated
-capabilities and does not mount the Docker socket.
+against a privileged Docker socket; no Docker socket is mounted. Only root
+startup receives the capabilities needed to install the firewall and drop to
+`node`; Pi and experiments run without capabilities or sudo.
 
 ## First run
 
@@ -32,11 +33,11 @@ capabilities and does not mount the Docker socket.
    if touch /workspace/{{ workspace_name }}/.must-not-write 2>/dev/null; then echo 'UNSAFE: experiment setup writable'; exit 1; fi
    ```
 
-3. Run a smoke test without a model (create the output folder first):
+3. Run a smoke test without a model:
 
    ```bash
    mkdir -p /results/manual-smoke
-   bash experiments/run.sh /results/manual-smoke 42
+   bash experiments/run.sh /results/manual-smoke 'python3 /workspace/{{ workspace_name }}/experiments/benchmark.py --project /project --output "$RUN_DIR" --seed 42'
    cat /results/manual-smoke/metrics.json
    ```
 
@@ -47,15 +48,27 @@ capabilities and does not mount the Docker socket.
    ./run-pi.sh
    ```
 
-5. Ask Pi to use `run_experiment` with several seeds. Replace
-   `experiments/benchmark.py` with a real metric before drawing conclusions.
+5. Tell Pi which experiment to use: “Use `/project/experiment.py`; read its
+   `--help` and run a small experiment.” Pi can inspect source and execute shell
+   commands through `run_experiment` without changing the runner.
+
+   For example, discovery uses:
+
+   ```json
+   {"command": "python3 /project/experiment.py --help"}
+   ```
+
+   Each call starts in a fresh `/results/<uuid>` directory. Use absolute project
+   paths and `$RUN_DIR` for outputs; `cd /project` explicitly if required by a
+   script. The command, logs, and exit status are saved. Metrics are optional;
+   a JSON object at `$RUN_DIR/metrics.json` enables numeric metric ranking.
 
 ## Iteration
 
-Edit `.pi/extensions/experiments.ts`, `experiments/run.sh`, or
-`experiments/benchmark.py` from your **regular development devcontainer**.
-This experiment container intentionally cannot edit them. Rebuild the container
-when you change its Dockerfile. Pi can reload its extension with `/reload`.
+Edit project experiments from your **regular development devcontainer** and
+name them in chat; no prescribed filename or CLI is required. This experiment
+container intentionally cannot edit source or its setup. Rebuild the container
+when you change its Dockerfile. If changing extension code, use `/reload` in Pi.
 
 For project dependencies, create a runtime environment in `/results/.venv`,
 not `/project/.venv`. `UV_PROJECT_ENVIRONMENT` and `UV_CACHE_DIR` are already
@@ -63,13 +76,64 @@ set under `/results`. To match complex scientific dependencies, modify the Pi
 Dockerfile or base it on the same runtime image as your development container.
 GPU access is not enabled; configure it deliberately if required.
 
+## Outbound firewall
+
+The firewall applies to Pi and every experiment command by default. Root startup
+installs fail-closed IPv4/IPv6 filter rules before resolving allowlisted hosts,
+then uses `setpriv` to run the command as `node` with all capability bounding
+bits dropped. Docker drops all capabilities except startup-only `NET_ADMIN`,
+`SETUID`, `SETGID`, and `SETPCAP`; no-new-privileges and the PID limit remain.
+The agent cannot modify the root-owned firewall or obtain firewall privileges.
+Configuration or DNS resolution failure stops startup with restrictive rules
+remaining in place.
+
+Allowed traffic is loopback, inbound responses to permitted connections, DNS
+(TCP/UDP port 53) to IPv4 nameservers from `/etc/resolv.conf`, and IPv4 TCP
+port 443 to A records resolved at startup for allowlisted hosts. Other outbound
+traffic is rejected, including external IPv6. Docker NAT is preserved. There
+are no SSH, host-gateway, broad GitHub CIDR, or blanket telemetry exceptions.
+
+The defaults cover Pi/model/auth (`api.anthropic.com`, `api.openai.com`,
+`auth.openai.com`, `chatgpt.com`, `pi.dev`), package downloads
+(`registry.npmjs.org`, `pypi.org`, `files.pythonhosted.org`), GitHub
+(`github.com`, `api.github.com`, `raw.githubusercontent.com`,
+`objects.githubusercontent.com`), and editor services
+(`marketplace.visualstudio.com`, `vscode.blob.core.windows.net`,
+`update.code.visualstudio.com`).
+
+For a different provider or dataset host, edit
+`.devcontainer/firewall-allowlist.txt` **on the host or in your regular
+development devcontainer**, then rebuild this Pi container. Use one hostname
+per line; comments and blank lines are accepted. The Dockerfile copies this
+allowlist, `.devcontainer/init-firewall.py`, and `.devcontainer/entrypoint.sh`
+into root-owned `/usr/local/lib/autoresearch/`. Changing a mounted copy does
+not alter the active policy; the agent cannot edit the baked files.
+
+This is an IP allowlist, not domain-level security or total network isolation.
+Shared IPs may expose other services; permitted services and DNS can be used
+for data exfiltration. External access is IPv4 HTTPS only. DNS address rotation
+requires restarting the container to resolve again. Image builds are not
+filtered by the runtime firewall. Commands still can read credential files.
+
+Manual checks inside this container, using `curl` if available:
+
+```bash
+curl --noproxy '*' --connect-timeout 10 -I https://api.openai.com
+curl --noproxy '*' --connect-timeout 10 -I https://example.com
+curl --noproxy '*' --connect-timeout 10 -6 -I 'https://[2606:4700:4700::1111]'
+```
+
+The first should return an HTTP status (any status proves reachability; do not
+use `-f`). The other two should fail to connect. These checks do not establish
+domain security or prevent exfiltration through allowed destinations.
+
 ## Trust and limitations
 
-- Pi's tool allowlist is a defense-in-depth measure, not an operating-system
-  sandbox. The extension itself executes trusted code from this folder.
-- The trusted experiment code runs with the container's permissions and can
-  access network services; the extension passes a minimal environment instead
-  of model credentials to experiments.
+- `run_experiment` provides general shell execution with the container user's
+  permissions and the same outbound firewall as Pi. The tool allowlist is not
+  a shell sandbox.
+- The extension passes a minimal environment rather than model credentials,
+  but commands can still read accessible credential files, including Pi state.
 - The read-only project mount prevents filesystem edits through that mount,
   but does not redact potentially sensitive source files from Pi.
 - The image uses a conventional writable container layer for system temporary

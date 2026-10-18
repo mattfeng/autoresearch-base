@@ -1,12 +1,12 @@
 /**
  * Minimal experiment-only Pi extension.
  *
- * This extension accepts structured parameters, launches ONE fixed runner,
- * writes under /results only, and exposes read-only result summaries.
+ * Accepts model-selected shell commands, records runs under /results,
+ * and exposes result summaries. Commands may inspect CLI help before running.
  * Edit it from the normal development devcontainer, then /reload in Pi.
  *
- * The extension is trusted code. A Docker read-only bind mount, not this file,
- * is what protects the parent project from experiment writes.
+ * Commands execute with the container user's permissions. Docker read-only
+ * bind mounts, not command restrictions here, protect the project source.
  */
 
 import { spawn } from "node:child_process";
@@ -24,7 +24,7 @@ const MAX_SCANNED_RUNS = 1000;
 
 type RunRecord = {
   run_id: string;
-  seed: number;
+  command: string;
   started_at: string;
   finished_at: string;
   duration_ms: number;
@@ -78,9 +78,9 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "run_experiment",
     label: "Run experiment",
-    description: "Execute the approved benchmark with a random seed; persist logs, metrics, and run metadata under /results.",
+    description: "Execute a shell command in the experiment container, including --help discovery. Persist command, logs, and optional metrics under /results. Commands start in their run directory; use absolute /project paths and $RUN_DIR for outputs.",
     parameters: Type.Object({
-      seed: Type.Integer({ minimum: 0, maximum: 2147483647 }),
+      command: Type.String({ minLength: 1 }),
     }),
     async execute(_id, params, signal) {
       const runId = randomUUID();
@@ -95,7 +95,7 @@ export default function (pi: ExtensionAPI) {
       let exitCode = 1;
 
       try {
-        const child = spawn("bash", [RUNNER, runDir, String(params.seed)], {
+        const child = spawn("bash", [RUNNER, runDir, params.command], {
           cwd: runDir,
           detached: true,
           stdio: ["ignore", logFile.fd, logFile.fd],
@@ -132,7 +132,7 @@ export default function (pi: ExtensionAPI) {
 
       const record: RunRecord = {
         run_id: runId,
-        seed: params.seed,
+        command: params.command,
         started_at: startedAt,
         finished_at: new Date().toISOString(),
         duration_ms: Date.now() - startTime,
@@ -148,7 +148,7 @@ export default function (pi: ExtensionAPI) {
       return {
         content: [{ type: "text", text: JSON.stringify({ ...record, run_dir: runDir, metrics, log_tail: logTail }) }],
         details: { ...record, run_dir: runDir, metrics },
-        isError: exitCode !== 0 || timedOut || aborted || metrics === null,
+        isError: exitCode !== 0 || timedOut || aborted,
       };
     },
   });
@@ -189,7 +189,7 @@ export default function (pi: ExtensionAPI) {
         )
         .map(({ record, metrics }) => ({
           run_id: record.run_id,
-          seed: record.seed,
+          command: record.command,
           metric: params.metric,
           value: (metrics as Record<string, number>)[params.metric],
         }))

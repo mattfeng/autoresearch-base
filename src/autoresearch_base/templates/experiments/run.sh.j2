@@ -1,19 +1,18 @@
 #!/usr/bin/env bash
-# Trusted fixed-command runner. Called ONLY by the Pi extension.
+# Command runner. Project write protection comes from Docker read-only mounts.
 set -euo pipefail
 
 if [[ "$#" -ne 2 ]]; then
-  echo "Usage: run.sh <absolute-output-directory> <seed>" >&2
+  echo "Usage: run.sh <absolute-output-directory> <command>" >&2
   exit 2
 fi
 
-RUN_DIR="$1"
-SEED="$2"
+export RUN_DIR="$1"
+COMMAND="$2"
 PROJECT_DIR="${AUTORESEARCH_PROJECT_DIR:-/project}"
-WORKSPACE_DIR="${AUTORESEARCH_WORKSPACE_DIR:-/workspace/{{ workspace_name }}}"
 
-if [[ "$RUN_DIR" != /* || ! "$SEED" =~ ^[0-9]+$ ]]; then
-  echo "Expected an absolute output path and a nonnegative integer seed" >&2
+if [[ "$RUN_DIR" != /* || -z "$COMMAND" ]]; then
+  echo "Expected an absolute output path and a nonempty command" >&2
   exit 2
 fi
 
@@ -26,7 +25,4 @@ export PYTHONPATH="$PROJECT_DIR:$PROJECT_DIR/src"
 export JAX_COMPILATION_CACHE_DIR="$RUN_DIR/cache/jax"
 
 cd "$RUN_DIR"
-python3 -B "$WORKSPACE_DIR/experiments/benchmark.py" \
-  --project "$PROJECT_DIR" \
-  --output "$RUN_DIR" \
-  --seed "$SEED"
+exec bash -euo pipefail -c "$COMMAND"

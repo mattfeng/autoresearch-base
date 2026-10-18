@@ -16,6 +16,9 @@ from jinja2 import Environment, StrictUndefined
 TEMPLATES: dict[str, str] = {
     "devcontainer/Dockerfile.j2": ".devcontainer/Dockerfile",
     "devcontainer/devcontainer.json.j2": ".devcontainer/devcontainer.json",
+    "devcontainer/init-firewall.py.j2": ".devcontainer/init-firewall.py",
+    "devcontainer/firewall-allowlist.txt.j2": ".devcontainer/firewall-allowlist.txt",
+    "devcontainer/entrypoint.sh.j2": ".devcontainer/entrypoint.sh",
     "pi_extensions/experiments.ts.j2": ".pi/extensions/experiments.ts",
     "experiments/run.sh.j2": "experiments/run.sh",
     "experiments/benchmark.py.j2": "experiments/benchmark.py",

@@ -18,12 +18,15 @@ my-project/
 └── autoresearch/
     ├── .devcontainer/
     │   ├── devcontainer.json   # Independent Pi devcontainer
-    │   └── Dockerfile
+    │   ├── Dockerfile
+    │   ├── entrypoint.sh       # Root startup, then unprivileged node
+    │   ├── init-firewall.py    # Fail-closed outbound firewall
+    │   └── firewall-allowlist.txt # Hosts resolved at container startup
     ├── .pi/extensions/
     │   └── experiments.ts      # Pi: run/list/compare tools
     ├── experiments/
-    │   ├── run.sh              # Fixed-command trusted execution entrypoint
-    │   └── benchmark.py       # Executable smoke test; replace with real benchmark
+    │   ├── run.sh              # Logged shell-command execution entrypoint
+    │   └── benchmark.py       # Optional executable smoke test
     ├── results/               # Only host-project writable output path for Pi
     ├── run-pi.sh              # Restricted Pi launcher
     ├── AGENTS.md              # Experiment instructions
@@ -73,14 +76,15 @@ contents match the templates. It refuses to overwrite edited files without
 
    ```bash
    mkdir -p /results/manual-smoke
-   bash experiments/run.sh /results/manual-smoke 42
+   bash experiments/run.sh /results/manual-smoke 'python3 /workspace/autoresearch/experiments/benchmark.py --project /project --output "$RUN_DIR" --seed 42'
    cat /results/manual-smoke/metrics.json
    ```
 
 5. Configure Pi authentication and start `./run-pi.sh`. The custom Pi extension
    provides `run_experiment`, `list_experiments`, and `compare_experiments`.
-6. Replace `experiments/benchmark.py` and modify `experiments/run.sh` to use your
-   project's actual Python environment, metrics, and correctness checks.
+6. Tell Pi which experiment file to use, for example: “Use `/project/experiment.py`;
+   inspect its `--help` and run a small experiment.” No runner edits or prescribed
+   CLI are needed. Customize the container runtime for your project's dependencies.
 
 ## Isolation boundaries
 
@@ -96,23 +100,77 @@ opened by Dev Containers must be `my-project/autoresearch`, not `my-project`.
 The same physical `results` folder is reachable read-only via `/project` and
 writable via `/results`. This is intentional.
 
-The Pi launcher uses a strict read-only tool allowlist (`read`, `grep`, `find`,
-`ls`), the three custom experiment tools, `--no-mcp`, and an explicit extension
-load. It does **not** expose Pi's `bash`, `edit`, or `write` tools. Experiments
-always execute the fixed trusted `experiments/run.sh`; the model never supplies
-shell text or a filesystem path.
+The Pi launcher exposes file-browsing tools (`read`, `grep`, `find`, `ls`) and
+the three custom experiment tools, with `--no-mcp` and an explicit extension
+load. It does not expose Pi's built-in `bash`, `edit`, or `write` tools, but
+`run_experiment` accepts arbitrary shell commands, including CLI `--help`.
+This is general shell execution with logging, not a read-only tool boundary.
+Commands start in a fresh `/results/<uuid>` directory, with `$RUN_DIR` exported
+for output paths. Command text, timing, exit status, and logs are recorded.
+`metrics.json` is optional; numeric metrics enable `compare_experiments`.
 
 The experiment process receives a reduced environment that omits model API
 credentials, and runs with a timeout. Project source and runner mounts are
-read-only. Docker starts with capabilities dropped, no new privileges, and no
-Docker socket. Container writable layers and Pi's persistent state still exist;
-only the results mount writes back into the repository.
+read-only. Docker drops all capabilities except `NET_ADMIN`, `SETUID`, `SETGID`,
+and `SETPCAP` needed by the root startup entrypoint. It installs the firewall,
+then runs the container command as `node` with all capability bounding bits
+dropped. Pi and experiment commands have no firewall capabilities or sudo.
+No-new-privileges and a PID limit remain enabled; no Docker socket is mounted.
+Container writable layers and Pi's persistent state still exist; only the
+results mount writes back into the repository.
 
 **Security caveats:** a read-only mount does not hide secrets in the repository,
-and trusted benchmark code can still perform network requests or write to
-container-private storage. This is a practical source-protection model, not a
-hostile-code sandbox. Do not run untrusted experiment code with host credentials.
-Network restrictions and GPU access are intentionally left for later hardening.
+and model-selected commands can still use allowed network services, read Pi's
+persistent credentials, or write to container-private storage. A reduced
+environment is not credential isolation. This is a practical source-protection
+model, not a hostile-code sandbox. Do not expose sensitive credentials to commands.
+GPU access is not enabled.
+
+## Outbound firewall
+
+The generated Pi container enables an outbound allowlist by default, covering
+both Pi itself and all experiment commands. Root startup installs restrictive
+IPv4 and IPv6 filter rules **before** resolving allowlisted hosts. Startup stops
+if configuration or resolution fails, leaving restrictive rules in place.
+The firewall allows loopback, inbound responses to permitted connections,
+TCP/UDP DNS on port 53 to IPv4 nameservers in `/etc/resolv.conf`, and outbound
+IPv4 TCP port 443 to the startup-resolved A records of allowlisted hosts.
+Other outbound traffic is rejected; external IPv6 is blocked. Docker NAT rules
+are preserved. There are no SSH, host-gateway, or broad GitHub CIDR exceptions.
+
+Defaults cover Pi/model/auth (`api.anthropic.com`, `api.openai.com`,
+`auth.openai.com`, `chatgpt.com`, `pi.dev`), packages (`registry.npmjs.org`,
+`pypi.org`, `files.pythonhosted.org`), GitHub (`github.com`, `api.github.com`,
+`raw.githubusercontent.com`, `objects.githubusercontent.com`), and editor
+services (`marketplace.visualstudio.com`, `vscode.blob.core.windows.net`,
+`update.code.visualstudio.com`), not blanket telemetry access.
+
+To add a provider or dataset service, edit
+`autoresearch/.devcontainer/firewall-allowlist.txt` **on the host or in your
+regular development devcontainer**, then rebuild the Pi container. Use one
+hostname per line; blank lines and comments are accepted. The image bakes the
+allowlist and startup scripts into root-owned `/usr/local/lib/autoresearch/`;
+editing a mounted copy does not change the active policy. The agent cannot
+edit that policy or acquire firewall capabilities.
+
+This is an IP allowlist, not domain-level security or total network isolation:
+shared IPs can expose other services, permitted services can receive exfiltrated
+data, and allowed DNS can carry exfiltration. Only IPv4 HTTPS is supported
+externally; DNS address rotation requires a container restart to resolve again.
+Image builds are not filtered by this runtime firewall. Commands can still read
+accessible credential files; do not treat reduced environments as secret isolation.
+
+For manual checks inside the Pi container, use `curl` if available:
+
+```bash
+curl --noproxy '*' --connect-timeout 10 -I https://api.openai.com
+curl --noproxy '*' --connect-timeout 10 -I https://example.com
+curl --noproxy '*' --connect-timeout 10 -6 -I 'https://[2606:4700:4700::1111]'
+```
+
+Any HTTP status from the first command establishes reachability (do not use
+`-f`); the second and third should fail to connect. These are manual checks,
+not a guarantee against the IP-sharing and exfiltration limitations above.
 
 ## Scientific experiments
 
