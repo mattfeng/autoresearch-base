@@ -143,7 +143,7 @@ No project settings file is generated in the new layout.
 
 ## Next steps
 
-The generated image includes `fd`, zsh, and Oh My Zsh. Both the `node` account
+The generated image includes `fd`, `htop`, zsh, and Oh My Zsh. Both the `node` account
 and VS Code's default terminal use zsh. Image defaults provide `HOME=/home/node`
 and `SHELL=/bin/zsh`, including for `docker exec --user node`. The root firewall
 entrypoint explicitly sets `HOME=/root` and `SHELL=/bin/bash` for startup only.
