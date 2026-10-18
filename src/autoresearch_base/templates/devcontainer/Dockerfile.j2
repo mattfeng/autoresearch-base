@@ -34,7 +34,7 @@ USER root
 ENV HOME=/root SHELL=/bin/bash
 
 # Startup policy, node helper, and Pi defaults are immutable to the agent.
-COPY --chown=0:0 init-firewall.py firewall-allowlist.txt entrypoint.sh init-node.py pi-settings.json /usr/local/lib/autoresearch/
+COPY --chown=0:0 init-firewall.py init-gpu.py firewall-allowlist.txt entrypoint.sh init-node.py pi-settings.json /usr/local/lib/autoresearch/
 RUN chmod 0755 /usr/local/lib/autoresearch \
     && chmod 0444 /usr/local/lib/autoresearch/*
 

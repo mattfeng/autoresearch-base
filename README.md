@@ -118,7 +118,7 @@ without `gpus`, and the saved choice on reruns. `--gpus` enables access and
 `--no-gpus` disables it; either skips the GPU prompt. `--read-only` alone does
 not skip that prompt.
 
-`--non-interactive` skips both prompts, reuses saved selections and the saved GPU
+`--non-interactive` skips all prompts, reuses saved selections and the saved GPU
 choice (missing `gpus` means false), and requires a saved configuration unless
 explicit `--read-only` choices are supplied. With explicit source choices and no
 saved configuration, GPU access defaults off. `--gpus` or `--no-gpus` overrides
@@ -126,19 +126,21 @@ the saved/default GPU choice in either mode.
 
 Cancellation or EOF before generation writes nothing; no setup files or choices
 are written until successful generation. `--dry-run` previews without writing,
-including settings. Rerunning preserves matching generated files and refuses to
-overwrite changed generated files without `--force`; review changes before
-forcing replacement, including changes to source selections or GPU access.
+including settings. Rerunning preserves matching generated files. After source
+and GPU choices, interactive setup lists changed files and obsolete files and
+asks before replacing/removing them (default: no). Declining or EOF writes nothing.
+`--force` skips this confirmation; non-interactive updates still require `--force`.
+Interactive `--dry-run` previews changes without asking for overwrite permission.
 
 Regeneration removes obsolete `run-pi.sh`, `experiments/run.sh`,
 `.pi/extensions/research-tools.ts`, and `.pi/extensions/experiments.ts` only
-with `--force`. Review local edits before forcing removal. Symlinks at these
+with overwrite confirmation or `--force`. Review local edits first. Symlinks at these
 paths are rejected, even with `--force`; remove them yourself after review.
 Experiments now run through Pi's built-in Bash tool.
 
-Regeneration removes the obsolete project `.pi/settings.json` only when it still
-matches the old generated defaults. Review a modified old file and migrate any
-desired choices to node's `~/.pi/agent/settings.json`; removal requires `--force`.
+Regeneration removes the obsolete project `.pi/settings.json`. Modified settings
+require confirmation or `--force`; review the old file and migrate desired choices
+to node's `~/.pi/agent/settings.json` before removal.
 No project settings file is generated in the new layout.
 
 ## Next steps
@@ -191,6 +193,14 @@ missing defaults, not existing user choices. To change active choices, edit
 `~/.pi/agent/settings.json` or use Pi's `/settings` **inside a node shell**.
 The `/home/node/.pi` volume persists settings, authentication, and sessions across
 rebuilds. Model defaults do not require a project extension or project settings.
+
+Root startup also runs `.devcontainer/init-gpu.py` before dropping privileges.
+It detects numeric GIDs of top-level NVIDIA character devices that grant group
+read/write access but not world read/write access, and adds `node` to those
+in-container groups. No host-specific GID is hardcoded. Membership survives
+`setpriv --init-groups` and applies to new VS Code terminals. Capability restrictions
+remain unchanged; no privileged mode or device permission changes are needed.
+Regenerate, rebuild, and recreate existing containers to apply this fix.
 
 ## Isolation boundaries
 

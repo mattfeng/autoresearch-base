@@ -19,6 +19,7 @@ TEMPLATES: dict[str, str] = {
     "devcontainer/Dockerfile.j2": ".devcontainer/Dockerfile",
     "devcontainer/devcontainer.json.j2": ".devcontainer/devcontainer.json",
     "devcontainer/init-firewall.py.j2": ".devcontainer/init-firewall.py",
+    "devcontainer/init-gpu.py.j2": ".devcontainer/init-gpu.py",
     "devcontainer/firewall-allowlist.txt.j2": ".devcontainer/firewall-allowlist.txt",
     "devcontainer/entrypoint.sh.j2": ".devcontainer/entrypoint.sh",
     "devcontainer/init-node.py.j2": ".devcontainer/init-node.py",

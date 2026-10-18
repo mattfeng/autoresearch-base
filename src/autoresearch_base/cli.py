@@ -57,6 +57,19 @@ def _prompt_gpu_access(default: bool) -> bool:
         print("Enter yes or no, or cancel to leave without writing files.")
 
 
+def _confirm_overwrite() -> None:
+    while True:
+        try:
+            answer = input("Overwrite these generated files and remove listed obsolete files? [y/N] ").strip().lower()
+        except (EOFError, KeyboardInterrupt) as error:
+            raise SelectionCancelled from error
+        if answer in {"", "n", "no", "cancel", "quit", "q"}:
+            raise SelectionCancelled
+        if answer in {"y", "yes"}:
+            return
+        print("Enter yes to overwrite, or no to leave without writing files.")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="configure-autoresearch",
@@ -120,8 +133,24 @@ def main(argv: list[str] | None = None) -> int:
             if not args.non_interactive:
                 gpus = _prompt_gpu_access(gpus)
         print(f"NVIDIA GPU access: {'enabled (--gpus=all)' if gpus else 'disabled'}")
+        force = args.force
+        if not force and not args.non_interactive:
+            plan = generate(
+                workspace, read_only_paths=selected, gpus=gpus, force=True, dry_run=True,
+            )
+            replacements = tuple(path for path in plan.written if path.exists())
+            if not args.dry_run and (replacements or plan.removed):
+                print("Existing autoresearch files will be replaced or removed; review local edits:")
+                for path in replacements:
+                    print(f"  OVERWRITE {path.relative_to(workspace)}")
+                for path in plan.removed:
+                    print(f"  REMOVE    {path.relative_to(workspace)}")
+                _confirm_overwrite()
+                force = True
+            if args.dry_run:
+                force = True
         result = generate(
-            workspace, read_only_paths=selected, gpus=gpus, force=args.force, dry_run=args.dry_run,
+            workspace, read_only_paths=selected, gpus=gpus, force=force, dry_run=args.dry_run,
         )
     except SelectionCancelled:
         print("\nSetup cancelled; no files written.")
