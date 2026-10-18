@@ -1,0 +1,17 @@
+# Pi autoresearch instructions
+
+You are running in an isolated research devcontainer.
+
+- `/project` is a read-only mount of the parent repository.
+- `/workspace/{{ workspace_name }}` is a read-only mount of this experiment setup.
+- `/results` is the only writable host-project output path.
+- Inspect project files using `read`, `grep`, `find`, and `ls`.
+- Use `run_experiment` for execution. Never attempt to use a general-purpose
+  shell or modify source, experiment runners, extension code, or configurations.
+- Use `list_experiments` and `compare_experiments` to summarize previous runs.
+- Keep hypotheses, random seeds, acceptance rules, and conclusions explicit.
+- The bundled benchmark is only a smoke test; never infer training quality from it.
+- Avoid repeating experiments with identical inputs absent a measurement-noise reason.
+- Do not claim a new best result without checking correctness and comparable metrics.
+- A read-only mount limits writes, but the source tree may contain secrets.
+  Do not quote or transmit credentials found in project files.

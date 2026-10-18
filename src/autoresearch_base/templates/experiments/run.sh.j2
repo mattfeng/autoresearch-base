@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Trusted fixed-command runner. Called ONLY by the Pi extension.
+set -euo pipefail
+
+if [[ "$#" -ne 2 ]]; then
+  echo "Usage: run.sh <absolute-output-directory> <seed>" >&2
+  exit 2
+fi
+
+RUN_DIR="$1"
+SEED="$2"
+PROJECT_DIR="${AUTORESEARCH_PROJECT_DIR:-/project}"
+WORKSPACE_DIR="${AUTORESEARCH_WORKSPACE_DIR:-/workspace/{{ workspace_name }}}"
+
+if [[ "$RUN_DIR" != /* || ! "$SEED" =~ ^[0-9]+$ ]]; then
+  echo "Expected an absolute output path and a nonnegative integer seed" >&2
+  exit 2
+fi
+
+mkdir -p "$RUN_DIR" "$RUN_DIR/cache" "$RUN_DIR/tmp"
+export TMPDIR="$RUN_DIR/tmp"
+export XDG_CACHE_HOME="$RUN_DIR/cache"
+export UV_CACHE_DIR="$RUN_DIR/cache/uv"
+export PYTHONDONTWRITEBYTECODE=1
+export PYTHONPATH="$PROJECT_DIR:$PROJECT_DIR/src"
+export JAX_COMPILATION_CACHE_DIR="$RUN_DIR/cache/jax"
+
+cd "$RUN_DIR"
+python3 -B "$WORKSPACE_DIR/experiments/benchmark.py" \
+  --project "$PROJECT_DIR" \
+  --output "$RUN_DIR" \
+  --seed "$SEED"

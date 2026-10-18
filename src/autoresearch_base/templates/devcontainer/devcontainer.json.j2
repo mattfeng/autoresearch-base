@@ -1,0 +1,27 @@
+{
+  "name": "Pi autoresearch: {{ workspace_name }}",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "remoteUser": "node",
+  "updateRemoteUserUID": true,
+  "workspaceFolder": "/workspace/{{ workspace_name }}",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace/{{ workspace_name }},type=bind,readonly",
+  "mounts": [
+    "source=${localWorkspaceFolder}/..,target=/project,type=bind,readonly",
+    "source=${localWorkspaceFolder}/results,target=/results,type=bind",
+    "source={{ volume_name }},target=/home/node/.pi,type=volume"
+  ],
+  "containerEnv": {
+    "PYTHONPATH": "/project:/project/src",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "XDG_CACHE_HOME": "/results/.cache",
+    "UV_CACHE_DIR": "/results/.cache/uv",
+    "UV_PROJECT_ENVIRONMENT": "/results/.venv"
+  },
+  "runArgs": [
+    "--cap-drop=ALL",
+    "--security-opt=no-new-privileges",
+    "--pids-limit=512"
+  ]
+}

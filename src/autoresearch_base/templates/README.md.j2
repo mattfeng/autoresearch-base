@@ -1,0 +1,80 @@
+# {{ workspace_name }}
+
+This directory has its own **separate** Pi devcontainer; the parent repository
+uses its original `.devcontainer/` configuration unchanged. Open **this folder**
+(`/path/to/repo/{{ workspace_name }}`), not the parent repository, in a second
+Visual Studio Code window. Choose **Dev Containers: Reopen in Container**.
+
+## Filesystem contract
+
+| In Pi container | Access | Host content |
+|---|---|---|
+| `/project` | read-only | parent repository, including this folder |
+| `/workspace/{{ workspace_name }}` | read-only | this folder (templates, extension, runner) |
+| `/results` | read/write | `{{ workspace_name }}/results` |
+| `/home/node/.pi` | read/write | persistent named volume for agent state |
+
+**Important:** The results directory is physically inside the parent repo on
+the host and writable through `/results`, even though `/project` is read-only.
+Do not place source code inside `results/` and treat experiment outputs as
+untrusted. No container is a security boundary against its host's kernel or
+against a privileged Docker socket; this image deliberately omits elevated
+capabilities and does not mount the Docker socket.
+
+## First run
+
+1. Open this folder in its own devcontainer window and build the container.
+2. In the new container, verify the mounts:
+
+   ```bash
+   test -r /project && test -w /results
+   if touch /project/.must-not-write 2>/dev/null; then echo 'UNSAFE: project writable'; exit 1; fi
+   if touch /workspace/{{ workspace_name }}/.must-not-write 2>/dev/null; then echo 'UNSAFE: experiment setup writable'; exit 1; fi
+   ```
+
+3. Run a smoke test without a model (create the output folder first):
+
+   ```bash
+   mkdir -p /results/manual-smoke
+   bash experiments/run.sh /results/manual-smoke 42
+   cat /results/manual-smoke/metrics.json
+   ```
+
+4. Configure your Pi model/provider using `pi` authentication or environment
+   variables, and then launch the restricted agent:
+
+   ```bash
+   ./run-pi.sh
+   ```
+
+5. Ask Pi to use `run_experiment` with several seeds. Replace
+   `experiments/benchmark.py` with a real metric before drawing conclusions.
+
+## Iteration
+
+Edit `.pi/extensions/experiments.ts`, `experiments/run.sh`, or
+`experiments/benchmark.py` from your **regular development devcontainer**.
+This experiment container intentionally cannot edit them. Rebuild the container
+when you change its Dockerfile. Pi can reload its extension with `/reload`.
+
+For project dependencies, create a runtime environment in `/results/.venv`,
+not `/project/.venv`. `UV_PROJECT_ENVIRONMENT` and `UV_CACHE_DIR` are already
+set under `/results`. To match complex scientific dependencies, modify the Pi
+Dockerfile or base it on the same runtime image as your development container.
+GPU access is not enabled; configure it deliberately if required.
+
+## Trust and limitations
+
+- Pi's tool allowlist is a defense-in-depth measure, not an operating-system
+  sandbox. The extension itself executes trusted code from this folder.
+- The trusted experiment code runs with the container's permissions and can
+  access network services; the extension passes a minimal environment instead
+  of model credentials to experiments.
+- The read-only project mount prevents filesystem edits through that mount,
+  but does not redact potentially sensitive source files from Pi.
+- The image uses a conventional writable container layer for system temporary
+  files. Only `/results` is writable back to the project host.
+- Generated file updates are intentional: regenerate with `--force` only after
+  reviewing changes; this replaces generated files.
+
+Reference: https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/extensions.md

@@ -1,0 +1,20 @@
+# Experiment protocol
+
+`run.sh <run-dir> <seed>` is the fixed trusted entry point. The extension picks
+`<run-dir>` under `/results/<uuid>`; the language model cannot select a shell
+command or choose arbitrary output paths.
+
+- Read source and datasets from `/project` (read-only Docker bind mount).
+- Write `metrics.json`, logs, checkpoints, plots, and all temporary artifacts
+  under the supplied run directory in `/results`.
+- Use stable metric names and a fixed evaluation budget.
+- Check numerical validity and correctness before recording an objective value.
+- Run multiple seeds for promising configurations and compare variance.
+- When using `uv` for project dependencies, keep `UV_PROJECT_ENVIRONMENT`
+  and `UV_CACHE_DIR` pointed under `/results`; read-only project roots cannot
+  host an automatically-created `.venv`.
+- To customize the runtime, modify `.devcontainer/Dockerfile` in your regular
+  development container and rebuild the Pi container.
+
+The bundled `benchmark.py` counts Python source files only as an executable
+smoke test. Replace it with your domain-specific evaluator.
