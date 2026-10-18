@@ -150,16 +150,41 @@ class GenerationResult:
     removed: tuple[Path, ...] = ()
 
 
+def normalize_gpu_selection(value: str) -> str:
+    """Normalize Docker GPU indices/UUIDs, or the all/none keywords."""
+    if not isinstance(value, str):
+        raise ConfigurationError("GPU selection must be all, none, or comma-separated indices/UUIDs")
+    value = value.strip()
+    if value.lower() in {"all", "none"}:
+        return value.lower()
+    devices = []
+    for device in value.split(","):
+        device = device.strip()
+        if re.fullmatch(r"[0-9]+", device):
+            device = str(int(device))
+        elif not re.fullmatch(r"(?:GPU-[a-zA-Z0-9-]+|MIG-[a-zA-Z0-9/-]+)", device):
+            raise ConfigurationError(
+                "GPU selection must be all, none, or comma-separated indices/UUIDs (for example 0,2)"
+            )
+        if device not in devices:
+            devices.append(device)
+    return ",".join(devices)
+
+
 def generate(
     workspace: Path,
     *,
     read_only_paths: Sequence[Path] = (),
-    gpus: bool = False,
+    gpus: str = "none",
     force: bool = False,
     dry_run: bool = False,
 ) -> GenerationResult:
     """Generate a workspace without exposing any unselected source paths."""
     workspace = validate_workspace(workspace)
+    gpus = normalize_gpu_selection(gpus)
+    gpu_run_arg = "" if gpus == "none" else (
+        "--gpus=all" if gpus == "all" else f'--gpus="device={gpus}"'
+    )
 
     read_only_mounts = plan_read_only_mounts(workspace, read_only_paths)
     volume_suffix = hashlib.sha256(str(workspace).encode()).hexdigest()[:10]
@@ -168,6 +193,7 @@ def generate(
         "volume_name": f"autoresearch-pi-{volume_suffix}",
         "read_only_mounts": read_only_mounts,
         "gpus": gpus,
+        "gpu_run_arg": gpu_run_arg,
         "settings_json": json.dumps(
             {"read_only": [mount.relative_source for mount in read_only_mounts], "gpus": gpus},
             ensure_ascii=False,

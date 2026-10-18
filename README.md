@@ -100,8 +100,11 @@ the common ancestor used for `/project` targets: review the displayed mapping.
 Selecting nothing leaves `/project` empty.
 
 Successful generation saves canonical, workspace-relative selections as
-`read_only` and the boolean GPU choice as `gpus` in `.autoresearch.json`,
-keeping sibling paths portable when the tree moves.
+`read_only` and the GPU selection as a canonical string in `gpus` in
+`.autoresearch.json`, keeping sibling paths portable when the tree moves.
+The GPU string is `none`, `all`, or a comma-separated list of device identifiers.
+On regeneration, legacy saved booleans migrate from `true` to `all` and `false`
+to `none`; missing `gpus` defaults to `none`.
 To bypass only the source picker, repeat `--read-only PATH`; relative paths are
 resolved against the **workspace**, not the shell's working directory, and
 override the saved list:
@@ -112,17 +115,25 @@ configure-autoresearch --workspace /host/project/math-experiments \
 configure-autoresearch --workspace /host/project/math-experiments --non-interactive
 ```
 
-Interactive setup also asks **“Give the devcontainer access to all NVIDIA GPUs?”**
-with a yes/no choice. The default is off for a new configuration or older settings
-without `gpus`, and the saved choice on reruns. `--gpus` enables access and
-`--no-gpus` disables it; either skips the GPU prompt. `--read-only` alone does
-not skip that prompt.
+Interactive setup asks for a GPU selection: `all`, `none`, or comma-separated
+numeric indices or NVIDIA GPU UUIDs (`GPU-...` or `MIG-...` identifiers).
+For example, `0,2` selects only those indices. Enter keeps the saved selection,
+or `none` for a new configuration or settings without `gpus`; `cancel`, `quit`,
+or `q` cancels setup. `--read-only` alone does not skip this prompt.
+Pass `--gpus VALUE` to skip the GPU prompt and override the saved/default choice
+in either mode. A value is required:
+
+```bash
+configure-autoresearch --workspace /host/project/math-experiments --gpus all
+configure-autoresearch --workspace /host/project/math-experiments --gpus none
+configure-autoresearch --workspace /host/project/math-experiments --gpus 0,2
+configure-autoresearch --workspace /host/project/math-experiments --gpus GPU-uuid
+```
 
 `--non-interactive` skips all prompts, reuses saved selections and the saved GPU
-choice (missing `gpus` means false), and requires a saved configuration unless
+choice (missing `gpus` means `none`), and requires a saved configuration unless
 explicit `--read-only` choices are supplied. With explicit source choices and no
-saved configuration, GPU access defaults off. `--gpus` or `--no-gpus` overrides
-the saved/default GPU choice in either mode.
+saved configuration, GPU access defaults to `none`.
 
 Cancellation or EOF before generation writes nothing; no setup files or choices
 are written until successful generation. `--dry-run` previews without writing,
@@ -264,8 +275,11 @@ sandbox. Do not expose sensitive credentials to commands.
 
 ### Optional NVIDIA GPU access
 
-GPU access is off by default. Enabling it adds Docker's `--gpus=all` runtime
-argument to the existing devcontainer; disabling it omits that argument.
+GPU access defaults to `none`, which omits Docker's GPU runtime argument.
+Selecting `all` adds `--gpus=all`; a subset such as `0,2` adds the literal runtime
+argument `--gpus="device=0,2"` to expose only the selected devices. UUID selections
+(`GPU-...` or `MIG-...`) use the same comma-separated `device=` form. These are
+Docker runtime selections, not GPU discovery or hardware validation by setup.
 This is Linux/Docker NVIDIA GPU passthrough, not Apple Metal or macOS GPU support.
 The Docker host needs compatible NVIDIA GPUs, drivers, and the NVIDIA Container
 Toolkit. Setup does not detect GPUs or install drivers, the toolkit, or CUDA.

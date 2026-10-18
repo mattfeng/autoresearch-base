@@ -39,8 +39,8 @@
     "UV_PROJECT_ENVIRONMENT": {{ ("/tmp/" ~ workspace_name ~ "/.venv") | tojson }}
   },
   "runArgs": [
-{% if gpus %}
-    "--gpus=all",
+{% if gpu_run_arg %}
+    {{ gpu_run_arg | tojson }},
 {% endif %}
     "--shm-size=1g",
     "--cap-drop=ALL",

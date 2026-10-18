@@ -7,7 +7,9 @@ import json
 import sys
 from pathlib import Path
 
-from .generator import ConfigurationError, generate, plan_read_only_mounts, validate_workspace
+from .generator import (
+    ConfigurationError, generate, normalize_gpu_selection, plan_read_only_mounts, validate_workspace,
+)
 from .picker import SelectionCancelled, pick_read_only_paths
 
 
@@ -28,33 +30,39 @@ def load_read_only_paths(workspace: Path) -> tuple[Path, ...] | None:
     return tuple((workspace / Path(path).expanduser()).resolve() for path in value["read_only"])
 
 
-def _load_gpu_access(workspace: Path) -> bool:
+def _load_gpu_access(workspace: Path) -> str:
     configuration = workspace / ".autoresearch.json"
     if not configuration.exists():
-        return False
+        return "none"
     try:
         value = json.loads(configuration.read_text(encoding="utf-8"))
     except (ValueError, OSError) as error:
         raise ConfigurationError(f"Cannot read saved configuration {configuration}: {error}") from error
-    if not isinstance(value, dict) or not isinstance(value.get("gpus", False), bool):
-        raise ConfigurationError(f"Expected a boolean 'gpus' value in {configuration}")
-    return value.get("gpus", False)
+    if not isinstance(value, dict):
+        raise ConfigurationError(f"Expected a configuration object in {configuration}")
+    selection = value.get("gpus", "none")
+    # Migrate saved configurations from the original boolean GPU choice.
+    if isinstance(selection, bool):
+        return "all" if selection else "none"
+    return normalize_gpu_selection(selection)
 
 
-def _prompt_gpu_access(default: bool) -> bool:
-    choices = "[Y/n]" if default else "[y/N]"
+def _prompt_gpu_access(default: str) -> str:
     while True:
         try:
-            answer = input(f"Give the devcontainer access to all NVIDIA GPUs? {choices} ").strip().lower()
+            answer = input(
+                f"NVIDIA GPUs: all, none, or comma-separated indices/UUIDs [{default}]: "
+            ).strip()
         except (EOFError, KeyboardInterrupt) as error:
             raise SelectionCancelled from error
-        if answer in {"cancel", "quit", "q"}:
+        if answer.lower() in {"cancel", "quit", "q"}:
             raise SelectionCancelled
         if not answer:
             return default
-        if answer in {"y", "yes", "n", "no"}:
-            return answer in {"y", "yes"}
-        print("Enter yes or no, or cancel to leave without writing files.")
+        try:
+            return normalize_gpu_selection(answer)
+        except ConfigurationError as error:
+            print(f"{error}. Enter cancel to leave without writing files.")
 
 
 def _confirm_overwrite() -> None:
@@ -98,9 +106,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--gpus",
-        action=argparse.BooleanOptionalAction,
-        default=None,
-        help="enable/disable all NVIDIA GPUs; otherwise prompt or reuse the saved choice",
+        type=normalize_gpu_selection,
+        metavar="SELECTION",
+        help="all, none, or comma-separated NVIDIA GPU indices/UUIDs (for example 0,2)",
     )
     parser.add_argument("--force", action="store_true", help="replace changed generated files")
     parser.add_argument("--dry-run", action="store_true", help="show planned files without writing")
@@ -132,7 +140,7 @@ def main(argv: list[str] | None = None) -> int:
             gpus = _load_gpu_access(workspace)
             if not args.non_interactive:
                 gpus = _prompt_gpu_access(gpus)
-        print(f"NVIDIA GPU access: {'enabled (--gpus=all)' if gpus else 'disabled'}")
+        print(f"NVIDIA GPU selection: {gpus}")
         force = args.force
         if not force and not args.non_interactive:
             plan = generate(

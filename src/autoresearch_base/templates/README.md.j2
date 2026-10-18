@@ -100,7 +100,10 @@ the workspace's parent can shift the common ancestor used for target paths.
 The root-owned `/project` scaffolding is not a writable work area.
 
 Source selections are saved as portable workspace-relative paths in `read_only`
-and the boolean GPU choice as `gpus` in `.autoresearch.json`.
+and the GPU selection as a canonical string in `gpus` in `.autoresearch.json`:
+`none`, `all`, or a comma-separated list of device identifiers. On regeneration,
+legacy saved booleans migrate from `true` to `all` and `false` to `none`.
+Missing `gpus` defaults to `none`.
 Rerun `configure-autoresearch --workspace /path/to/this-folder` on the host to
 browse from this workspace with saved choices prechecked. Use `ls`, `up`,
 `cd NAME/INDEX/PATH`, `toggle INDEX/PATH`, `select .`, and `selected`; review
@@ -115,16 +118,19 @@ count once, and invalid batches do not change any selections.
 
 Alternatively, pass repeatable `--read-only PATH` choices (relative to the
 workspace, overriding saved choices) to skip only the source picker.
-Interactive setup also asks **“Give the devcontainer access to all NVIDIA GPUs?”**
-with a yes/no choice, defaulting to the saved choice, or off for new/older
-settings without `gpus`. `--read-only` alone still prompts for GPU access.
-`--gpus` enables access and `--no-gpus` disables it; either skips the GPU prompt.
+Interactive setup accepts `all`, `none`, or comma-separated numeric indices or
+NVIDIA GPU UUIDs (`GPU-...` or `MIG-...` identifiers). For example, `0,2` selects
+only those indices. Enter keeps the saved selection, or `none` for new settings
+or settings without `gpus`; `cancel`, `quit`, or `q` cancels setup.
+`--read-only` alone still prompts for the GPU selection.
+Pass `--gpus VALUE` to skip that prompt and override the saved/default choice in
+either mode. A value is required: use `--gpus all`, `--gpus none`, `--gpus 0,2`,
+or `--gpus GPU-uuid`.
 
 `--non-interactive` skips all prompts and reuses saved configuration, including
-the GPU choice (missing `gpus` means false). It requires saved configuration
+the GPU choice (missing `gpus` means `none`). It requires saved configuration
 unless explicit `--read-only` choices are supplied; with explicit source choices
-and no saved configuration, GPU access defaults off. `--gpus` or `--no-gpus`
-overrides the saved/default GPU choice in either mode.
+and no saved configuration, GPU access defaults to `none`.
 
 Cancellation or EOF before generation writes nothing. No writes occur until
 successful generation; `--dry-run` never writes files or settings. After source
@@ -160,19 +166,26 @@ The container allocates 1 GiB to `/dev/shm` via `--shm-size=1g`.
 
 ### NVIDIA GPU access
 
-{% if gpus %}
-**Selected GPU access: enabled.** This devcontainer includes Docker's
-`--gpus=all` runtime argument to expose all available NVIDIA GPUs.
+{% if gpus == 'all' %}
+**Selected GPU access: all NVIDIA GPUs.** This devcontainer includes Docker's
+`{{ gpu_run_arg }}` runtime argument to expose all available NVIDIA GPUs.
+{% elif gpus != 'none' %}
+**Selected GPU access: `{{ gpus }}` only.** This devcontainer includes Docker's
+`{{ gpu_run_arg }}` runtime argument to expose only the selected device indices
+or UUIDs, not all NVIDIA GPUs.
 {% else %}
-**Selected GPU access: disabled.** This devcontainer omits Docker's `--gpus=all`
-runtime argument.
+**Selected GPU access: none.** This devcontainer omits Docker's GPU runtime
+argument.
 {% endif %}
 
 This option is Linux/Docker NVIDIA GPU passthrough, not Apple Metal or macOS GPU
 support. The Docker host needs compatible NVIDIA GPUs, drivers, and the NVIDIA
 Container Toolkit. Setup does not detect GPUs or install drivers, the toolkit,
 or CUDA. Scientific workloads may also need user-provided CUDA-enabled runtime
-dependencies in the Dockerfile or Python environment.
+dependencies in the Dockerfile or Python environment. `all` uses `--gpus=all`;
+a subset such as `0,2` uses the literal runtime argument `--gpus="device=0,2"`.
+UUID selections use the same comma-separated `device=` form. Docker applies the
+runtime selection; setup does not discover or validate GPU hardware.
 
 Before dropping privileges, root startup detects the numeric GIDs of top-level
 NVIDIA character devices where group membership grants additional read or write
@@ -182,11 +195,12 @@ no host-specific GID is hardcoded. Device modes and capability restrictions
 remain unchanged. Regenerate, rebuild, and recreate older containers to apply
 this permission fix.
 
-To change the selection, rerun setup on the host with `--gpus` or `--no-gpus`
+To change the selection, rerun setup on the host with `--gpus all`, `--gpus none`,
+or a subset such as `--gpus 0,2` or `--gpus GPU-uuid`
 (confirm replacements after reviewing local edits, or use `--force`), then recreate
 the devcontainer to apply the changed runtime arguments. Restarting the existing
 container is not enough.
-{% if gpus %}
+{% if gpus != 'none' %}
 
 After creating or recreating the container, optionally run `nvidia-smi` inside it
 to inspect GPU visibility:
