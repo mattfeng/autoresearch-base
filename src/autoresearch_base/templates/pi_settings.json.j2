@@ -1,5 +1,21 @@
 {
-  "defaultProvider": "openai-codex",
-  "defaultModel": "gpt-6.1-sol",
-  "defaultThinkingLevel": "medium"
+  "defaultProvider": "openai",
+  "defaultModel": "gpt-6-astra",
+  "defaultThinkingLevel": "high",
+  "subagents": {
+    "defaultModel": "openai/gpt-6.1-sol",
+    "defaultThinking": "medium",
+    "agentOverrides": {
+      "worker": {
+        "model": "openai/gpt-6.1-sol",
+        "thinking": "medium"
+      }
+    }
+  },
+  "packages": [
+    "/usr/local/lib/node_modules/pi-subagents",
+    "/usr/local/lib/node_modules/pi-parallel-sessions",
+    "/usr/local/lib/node_modules/pi-web-access",
+    "/usr/local/lib/node_modules/pi-powerline-footer"
+  ]
 }

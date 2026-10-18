@@ -156,7 +156,7 @@ No project settings file is generated in the new layout.
 
 ## Next steps
 
-The generated image includes `fd`, `htop`, zsh, and Oh My Zsh. Both the `node` account
+The generated image includes `fd`, `htop`, `vim`, zsh, and Oh My Zsh. Both the `node` account
 and VS Code's default terminal use zsh. Image defaults provide `HOME=/home/node`
 and `SHELL=/bin/zsh`, including for `docker exec --user node`. The root firewall
 entrypoint explicitly sets `HOME=/root` and `SHELL=/bin/bash` for startup only.
@@ -178,32 +178,55 @@ do not disable Oh My Zsh's completion security checks.
 2. Choose **Dev Containers: Reopen in Container**. This builds a separate image.
 3. Verify that selected source mounts are read-only and `/workspace/autoresearch`
    and its `results/` subdirectory are writable (instructions in generated `README.md`).
-4. Authenticate Pi with OpenAI Codex in a node shell, then run `pi` from the
-   container workspace directory.
+4. Configure OpenAI API authentication for Pi (for example, `OPENAI_API_KEY`)
+   in a node shell, then run `pi` from the container workspace directory.
+   The configured `openai` provider requires OpenAI API credentials; an OpenAI
+   Codex login alone does not authenticate it.
    After the root firewall setup, `setpriv` drops to node with no capabilities;
    `.devcontainer/init-node.py` initializes node's global
    `~/.pi/agent/settings.json` before executing the container command.
-   A new user receives provider `openai-codex`, model `gpt-6.1-sol`, and `medium`
-   thinking. The model must be available in your installed Pi/provider catalog
-   and account; these defaults do not add it to the catalog.
+   A new user receives `defaultProvider: openai`, `defaultModel: gpt-6-astra`,
+   and `defaultThinkingLevel: high`. Child-agent defaults are
+   `subagents.defaultModel: openai/gpt-6.1-sol` and
+   `subagents.defaultThinking: medium`; `subagents.agentOverrides.worker`
+   sets `model: openai/gpt-6.1-sol` and `thinking: medium`.
+   Models must be available in your installed Pi/provider catalog and account;
+   these defaults do not add them to the catalog.
    Existing settings and `auth.json` are preserved: the provider/model pair is
-   seeded only if neither key exists, and thinking is filled only when missing.
+   seeded only if neither key exists; thinking and nested subagent defaults are
+   filled only when missing, preserving existing values.
    Malformed existing settings stop startup rather than being overwritten.
-   Root's Pi settings are untouched. Pi uses its default built-in tools:
-   `read`, `bash`, `edit`, and `write`.
+   Root's Pi settings are untouched. Pi provides its built-in `read`, `bash`,
+   `edit`, and `write` tools plus the bundled pi-subagents extension tools.
 5. Tell Pi the experiment file and goals in chat, for example: “Use
    `/project/experiment.py`; inspect its source and `--help`, discover its
    configuration and output conventions, and run a small experiment.”
    No prescribed CLI or metrics format is needed. Customize the container
    runtime for your project's dependencies.
 
+The image installs Pi plus `pi-subagents`, `pi-parallel-sessions`, `pi-web-access`,
+and `pi-powerline-footer` with `npm install --global`. These are the image-bundled
+equivalents of the corresponding `npm:` Pi packages. Extensions live under
+`/usr/local/lib/node_modules`, outside the mounted `/home/node/.pi` volume.
+Startup appends their absolute sources to node's persistent settings `packages`
+array if absent, preserving user-installed package entries.
+`pi-web-access` remains subject to the existing outbound firewall; search-provider
+and fetched-site hosts must be allowed, with provider credentials configured as needed.
+
+Startup also seeds `~/.pi/agent/keybindings.json` with
+`"app.session.rename": "alt+r"` when that action is absent. Existing bindings,
+including custom rename shortcuts, are preserved; malformed files stop startup.
+
 The seed `.devcontainer/pi-settings.json` is editable from the host/development
 container and baked with `init-node.py` into root-owned
-`/usr/local/lib/autoresearch/`; rebuild to apply seed changes. Startup fills
-missing defaults, not existing user choices. To change active choices, edit
-`~/.pi/agent/settings.json` or use Pi's `/settings` **inside a node shell**.
-The `/home/node/.pi` volume persists settings, authentication, and sessions across
-rebuilds. Model defaults do not require a project extension or project settings.
+`/usr/local/lib/autoresearch/`. Regenerate the workspace (review local edits before
+`--force`), rebuild the image, and recreate the container to apply the bundled
+package and updated seed. Startup fills missing defaults, not existing user
+choices; rebuilding does not forcibly switch an existing provider/model pair.
+To change active choices, edit `~/.pi/agent/settings.json` or use Pi's `/settings`
+**inside a node shell**. The `/home/node/.pi` volume persists settings,
+authentication, and sessions across rebuilds. No project extension or project
+settings file is required.
 
 Root startup also runs `.devcontainer/init-gpu.py` before dropping privileges.
 It detects numeric GIDs of top-level NVIDIA character devices where group membership
@@ -237,6 +260,8 @@ project data in `/workspace/experiments/trackio`, shared across runs.
 Launch the dashboard in the same container to use that default. An explicit
 `TRACKIO_DIR` override is preserved. Trackio must be installed in your runtime.
 The container sets `TRACKIO_STORAGE_MODE=jsonl` and `TRACKIO_SQLITE_MMAP_SIZE=0`.
+The generated `AGENTS.md` reserves Trackio for full training runs. Other
+experiment results belong in appropriate files under `results/`, not Trackio.
 
 Run `pi` directly from `/workspace/autoresearch`. Pi's default tools are
 `read`, `bash`, `edit`, and `write`; Bash executes ordinary shell commands with

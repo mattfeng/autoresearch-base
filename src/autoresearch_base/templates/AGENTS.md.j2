@@ -38,3 +38,10 @@
   Do not quote or transmit credentials. The IP allowlist is not domain security
   or total isolation: shared IPs can expose other services, and permitted
   services or DNS can exfiltrate data.
+
+## Experiment results
+
+- Use Trackio only for full training runs. Do not create Trackio runs for smoke
+  tests, debugging, profiling, evaluation-only runs, or other experiment types.
+- Store other experiment results using appropriate files under `results/`, such
+  as JSON/JSONL, CSV, Markdown notes, plots, or profiler outputs.

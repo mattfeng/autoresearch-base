@@ -52,18 +52,44 @@ container command. The initializer seeds node's global
 `~/.pi/agent/settings.json` (`/home/node/.pi/agent/settings.json`) from the baked
 `.devcontainer/pi-settings.json`. Root's Pi settings are untouched.
 
-A new node user receives provider `openai-codex`, model `gpt-6.1-sol`, and
-`medium` thinking. Existing settings keys and `auth.json` are preserved.
-The provider/model pair is seeded only when neither key is present; thinking is
-filled only when missing. Malformed existing settings stop startup visibly
-instead of being overwritten. The `/home/node/.pi` named volume persists
-settings, authentication, and sessions across rebuilds.
+A new node user receives `defaultProvider: openai`, `defaultModel: gpt-6-astra`,
+and `defaultThinkingLevel: high`. Child-agent defaults are
+`subagents.defaultModel: openai/gpt-6.1-sol` and
+`subagents.defaultThinking: medium`; `subagents.agentOverrides.worker` sets
+`model: openai/gpt-6.1-sol` and `thinking: medium`. These models must be available
+in your installed Pi/provider catalog and account; configuration does not add
+them to the catalog.
 
-Edit `.devcontainer/pi-settings.json` on the host/development container and
-rebuild to change the baked seed. Startup does not overwrite existing user
-choices. To change active choices, edit `~/.pi/agent/settings.json` or use Pi's
-`/settings` **inside a node shell**. Model defaults do not require a project
-extension or project settings.
+Configure OpenAI API authentication (for example, `OPENAI_API_KEY`) in a node
+shell before running `pi`. The configured `openai` provider requires OpenAI API
+credentials; an OpenAI Codex login alone does not authenticate it.
+
+Existing settings keys and `auth.json` are preserved. The provider/model pair is
+seeded only when neither key is present; thinking and nested subagent defaults
+are filled only when missing, preserving existing values. Malformed existing
+settings stop startup visibly instead of being overwritten. The `/home/node/.pi`
+named volume persists settings, authentication, and sessions across rebuilds.
+
+The image installs Pi plus `pi-subagents`, `pi-parallel-sessions`, `pi-web-access`,
+and `pi-powerline-footer` with `npm install --global`. These are the image-bundled
+equivalents of the corresponding `npm:` Pi packages. Extensions live under
+`/usr/local/lib/node_modules`, outside the mounted `/home/node/.pi` volume.
+Startup appends their absolute sources to node's persistent settings `packages`
+array if absent, preserving user package entries. Built-in tools remain available.
+`pi-web-access` remains subject to the outbound firewall: search-provider and
+fetched-site hosts must be allowed, with provider credentials configured as needed.
+
+Startup also seeds `~/.pi/agent/keybindings.json` with
+`"app.session.rename": "alt+r"` when that action is absent. Existing bindings,
+including custom rename shortcuts, are preserved; malformed files stop startup.
+
+Edit `.devcontainer/pi-settings.json` on the host/development container to change
+the baked seed. For existing workspaces, regenerate the setup (review local edits
+before `--force`), rebuild the image, and recreate the container to apply the
+bundled package and updated seed. Startup does not overwrite existing user
+choices or forcibly switch an existing provider/model pair. To change active
+choices, edit `~/.pi/agent/settings.json` or use Pi's `/settings` **inside a node
+shell**. No project extension or project settings file is required.
 
 There is no generated project `.pi/settings.json`. Regeneration removes the old
 file. Modified settings require confirmation or `--force`; review the old file and
@@ -83,6 +109,8 @@ sessions and Pi-launched experiments. If Trackio is installed, local project
 data is saved in the workspace's `trackio/` subdirectory, shared across runs.
 The dashboard uses the same default. An explicit `TRACKIO_DIR` override is
 preserved; Trackio is not installed by this generator.
+`AGENTS.md` reserves Trackio for full training runs. Store other experiment
+results as appropriate files under `results/`, not Trackio.
 
 {% if read_only_mounts %}
 | Resolved host source | Relative to this workspace | Container target |
@@ -241,9 +269,9 @@ nvidia-smi
    PY
    ```
 
-3. Authenticate Pi with OpenAI Codex **as node**, then launch Pi.
-   The node settings described above default to `openai-codex/gpt-6.1-sol`
-   with `medium` thinking. Your installed Pi/provider catalog and account must
+3. Configure OpenAI API authentication **as node**, then launch Pi.
+   The node settings described above default to `openai/gpt-6-astra`
+   with `high` thinking. Your installed Pi/provider catalog and account must
    support this model; seeding defaults does not add it to the catalog.
 
    ```bash
@@ -253,8 +281,8 @@ nvidia-smi
 
 4. Tell Pi the experiment file and goals in chat: “Use `/project/experiment.py`;
    inspect its source and `--help`, discover its configuration and output
-   conventions, and run a small experiment.” Pi uses the built-in `read`,
-   `bash`, `edit`, and `write` tools.
+   conventions, and run a small experiment.” Pi's built-in tools remain available
+   alongside pi-subagents delegation tools.
 
    `/project/experiment.py` is illustrative: use a file beneath one of the
    selected targets above (for example `/project/math/experiment.py`).

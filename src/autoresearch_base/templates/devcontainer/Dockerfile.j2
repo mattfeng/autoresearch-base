@@ -4,7 +4,7 @@ FROM node:24-bookworm
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates curl git python3 python3-venv python3-pip ripgrep jq bash \
-    fd-find zsh iptables util-linux htop \
+    fd-find zsh iptables util-linux htop vim \
     && ln -s /usr/bin/fdfind /usr/local/bin/fd \
     && usermod --shell /bin/zsh node \
     && rm -rf /var/lib/apt/lists/*
@@ -14,9 +14,10 @@ RUN python3 -m venv /opt/uv \
     && /opt/uv/bin/pip install --no-cache-dir 'uv>=0.9,<1'
 ENV PATH="/opt/uv/bin:${PATH}"
 
-# The Pi CLI. Installed into the image as root;
-# Pi runs as the unprivileged node user.
-RUN npm install --global @earendil-works/pi-coding-agent
+# Install Pi and its bundled extensions outside node's persistent .pi volume.
+# Node's settings register the image-owned extensions at startup.
+RUN npm install --global @earendil-works/pi-coding-agent \
+    pi-subagents pi-parallel-sessions pi-web-access pi-powerline-footer
 
 # Install the interactive shell as node so its configuration stays user-owned.
 USER node
