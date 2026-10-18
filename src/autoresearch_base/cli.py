@@ -96,7 +96,7 @@ def main(argv: list[str] | None = None) -> int:
     for path in result.removed:
         print(f"  {'PLAN REMOVE' if args.dry_run else 'REMOVE'} {path.relative_to(result.workspace)}")
     if not args.dry_run:
-        print("Open this folder in a separate Dev Containers window and use ./run-pi.sh")
+        print(f"Start the devcontainer, then run `pi` as node from /workspace/{result.workspace.name}.")
     return 0
 
 

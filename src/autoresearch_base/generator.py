@@ -23,11 +23,8 @@ TEMPLATES: dict[str, str] = {
     "devcontainer/entrypoint.sh.j2": ".devcontainer/entrypoint.sh",
     "devcontainer/init-node.py.j2": ".devcontainer/init-node.py",
     "pi_settings.json.j2": ".devcontainer/pi-settings.json",
-    "experiments/benchmark.py.j2": "experiments/benchmark.py",
-    "experiments/README.md.j2": "experiments/README.md",
     "AGENTS.md.j2": "AGENTS.md",
     "README.md.j2": "README.md",
-    "run-pi.sh.j2": "run-pi.sh",
     "gitignore.j2": ".gitignore",
     "settings.json.j2": ".autoresearch.json",
 }
@@ -83,7 +80,7 @@ def validate_workspace(workspace: Path) -> Path:
 
     # Workspaces generated before saved selections have the same core layout.
     core_files = (
-        workspace / "run-pi.sh",
+        workspace / "AGENTS.md",
         workspace / ".devcontainer/devcontainer.json",
     )
     if all(path.is_file() and not path.is_symlink() for path in core_files):
@@ -205,6 +202,7 @@ def generate(
         removed = (old_pi_settings,)
 
     for obsolete_path in (
+        "run-pi.sh",
         "experiments/run.sh",
         ".pi/extensions/research-tools.ts",
         ".pi/extensions/experiments.ts",
@@ -252,8 +250,6 @@ def generate(
         for target, content in rendered.items():
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(content, encoding="utf-8")
-            if target.name == "run-pi.sh":
-                target.chmod(target.stat().st_mode | 0o111)
         if not (results_dir / ".gitkeep").exists():
             (results_dir / ".gitkeep").touch()
         for path in removed:

@@ -24,10 +24,7 @@ my-project/
     │   ├── init-node.py        # Initialize node's Pi settings, then exec command
     │   ├── pi-settings.json    # Model/thinking seed baked into the image
     │   └── firewall-allowlist.txt # Hosts resolved at container startup
-    ├── experiments/
-    │   └── benchmark.py       # Optional executable smoke test
     ├── results/               # Experiment outputs within the writable workspace
-    ├── run-pi.sh              # Launch Pi from the workspace
     ├── AGENTS.md              # Experiment instructions
     ├── .autoresearch.json     # Saved explicit read-only selections
     └── README.md
@@ -62,7 +59,7 @@ must be nonexistent, empty (with no hidden entries either), or an existing
 autoresearch workspace. Non-empty unrelated directories are rejected before
 the picker opens, even with `--force` or `--dry-run`. Existing workspaces are
 recognized by valid `.autoresearch.json` settings or their original generated
-launcher/devcontainer layout.
+`AGENTS.md`/devcontainer layout.
 
 There is no immediate-child-of-repository requirement, and the parent's
 `.devcontainer/` is not modified.
@@ -121,7 +118,7 @@ no setup files or selections are written until successful generation.
 matching generated files and refuses to overwrite changed generated files
 without `--force`; this also applies when changing saved selections.
 
-Regeneration removes obsolete `experiments/run.sh`,
+Regeneration removes obsolete `run-pi.sh`, `experiments/run.sh`,
 `.pi/extensions/research-tools.ts`, and `.pi/extensions/experiments.ts` only
 with `--force`. Review local edits before forcing removal. Symlinks at these
 paths are rejected, even with `--force`; remove them yourself after review.
@@ -156,15 +153,8 @@ do not disable Oh My Zsh's completion security checks.
 2. Choose **Dev Containers: Reopen in Container**. This builds a separate image.
 3. Verify that selected source mounts are read-only and `/workspace/autoresearch`
    and its `results/` subdirectory are writable (instructions in generated `README.md`).
-4. Run the bundled smoke test:
-
-   ```bash
-   mkdir -p /workspace/autoresearch/results/manual-smoke
-   python3 /workspace/autoresearch/experiments/benchmark.py --project /project --output /workspace/autoresearch/results/manual-smoke --seed 42
-   cat /workspace/autoresearch/results/manual-smoke/metrics.json
-   ```
-
-5. Authenticate Pi with OpenAI Codex in a node shell, then start `./run-pi.sh`.
+4. Authenticate Pi with OpenAI Codex in a node shell, then run `pi` from the
+   container workspace directory.
    After the root firewall setup, `setpriv` drops to node with no capabilities;
    `.devcontainer/init-node.py` initializes node's global
    `~/.pi/agent/settings.json` before executing the container command.
@@ -176,7 +166,7 @@ do not disable Oh My Zsh's completion security checks.
    Malformed existing settings stop startup rather than being overwritten.
    Root's Pi settings are untouched. Pi uses its default built-in tools:
    `read`, `bash`, `edit`, and `write`.
-6. Tell Pi the experiment file and goals in chat, for example: “Use
+5. Tell Pi the experiment file and goals in chat, for example: “Use
    `/project/experiment.py`; inspect its source and `--help`, discover its
    configuration and output conventions, and run a small experiment.”
    No prescribed CLI or metrics format is needed. Customize the container
@@ -214,8 +204,7 @@ project databases in `/workspace/experiments/trackio`, shared across runs.
 Launch the dashboard in the same container to use that default. An explicit
 `TRACKIO_DIR` override is preserved. Trackio must be installed in your runtime.
 
-`run-pi.sh` changes to `/workspace/autoresearch` and executes `pi "$@"`.
-It does not restrict tools or load a custom extension. Pi's default tools are
+Run `pi` directly from `/workspace/autoresearch`. Pi's default tools are
 `read`, `bash`, `edit`, and `write`; Bash executes ordinary shell commands with
 the container user's permissions and inherits Pi's environment, including any
 credentials available there.
@@ -299,8 +288,7 @@ not a guarantee against the IP-sharing and exfiltration limitations above.
 
 ## Scientific experiments
 
-The generated benchmark counts Python source files for a zero-dependency smoke
-test. It is **not** a research metric. Real experiments should:
+For scientific experiments:
 
 - use immutable evaluation data, fixed budgets, and correctness gates;
 - use `/workspace/autoresearch/results` for experiment artifacts; shared cache and environment defaults are configured separately;

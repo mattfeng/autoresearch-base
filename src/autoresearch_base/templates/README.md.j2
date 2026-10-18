@@ -17,11 +17,11 @@ For an existing workspace, regenerate the setup from your host/development
 container (review edits before using `--force`), rebuild this container, then
 open a new terminal. Existing terminal sessions retain their running shell.
 
-Regeneration removes obsolete `experiments/run.sh`,
+Regeneration removes obsolete `run-pi.sh`, `experiments/run.sh`,
 `.pi/extensions/research-tools.ts`, and `.pi/extensions/experiments.ts` only
 with `--force`. Review local edits before forcing removal. Symlinks at these
 paths are rejected even with `--force`; remove them yourself after review.
-`run-pi.sh` now launches ordinary Pi with its built-in tools.
+Run `pi` directly from the container workspace directory.
 
 Keep the final Dockerfile `USER root` for firewall startup. The entrypoint drops
 to `node` before running the container command; VS Code uses `remoteUser: node`.
@@ -175,24 +175,17 @@ drop to `node`; Pi and experiments run without capabilities or sudo.
    PY
    ```
 
-3. Run a smoke test without a model:
-
-   ```bash
-   mkdir -p results/manual-smoke
-   python3 "$PWD/experiments/benchmark.py" --project /project --output "$PWD/results/manual-smoke" --seed 42
-   cat results/manual-smoke/metrics.json
-   ```
-
-4. Authenticate Pi with OpenAI Codex **as node**, then launch Pi.
+3. Authenticate Pi with OpenAI Codex **as node**, then launch Pi.
    The node settings described above default to `openai-codex/gpt-6.1-sol`
    with `medium` thinking. Your installed Pi/provider catalog and account must
    support this model; seeding defaults does not add it to the catalog.
 
    ```bash
-   ./run-pi.sh
+   cd /workspace/{{ workspace_name }}
+   pi
    ```
 
-5. Tell Pi the experiment file and goals in chat: “Use `/project/experiment.py`;
+4. Tell Pi the experiment file and goals in chat: “Use `/project/experiment.py`;
    inspect its source and `--help`, discover its configuration and output
    conventions, and run a small experiment.” Pi uses the built-in `read`,
    `bash`, `edit`, and `write` tools.
@@ -201,8 +194,7 @@ drop to `node`; Pi and experiments run without capabilities or sudo.
    selected targets above (for example `/project/math/experiment.py`).
    No prescribed filename, CLI, or metrics format is required.
 
-`run-pi.sh` only changes to `/workspace/{{ workspace_name }}` and executes
-`pi "$@"`; it does not restrict tools or load a custom extension.
+Run `pi` directly from `/workspace/{{ workspace_name }}` with its built-in tools.
 Bash executes ordinary commands with node's permissions and inherits Pi's
 environment, including any credentials available there.
 
