@@ -37,6 +37,7 @@
     "UV_PROJECT_ENVIRONMENT": {{ ("/tmp/" ~ workspace_name ~ "/.venv") | tojson }}
   },
   "runArgs": [
+    "--shm-size=1g",
     "--cap-drop=ALL",
     "--cap-add=NET_ADMIN",
     "--cap-add=SETUID",

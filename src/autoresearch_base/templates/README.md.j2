@@ -143,6 +143,7 @@ preventing writes through its workspace path. No container is a security boundar
 against its host's kernel or a privileged Docker socket; no Docker socket is mounted.
 Only root startup receives the capabilities needed to install the firewall and
 drop to `node`; Pi and experiments run without capabilities or sudo.
+The container allocates 1 GiB to `/dev/shm` via `--shm-size=1g`.
 
 ## First run
 
