@@ -1,37 +1,40 @@
 # Pi autoresearch instructions
 
-You are running in an isolated research devcontainer.
-
-- `/project` is a read-only mount of the parent repository.
-- `/workspace/{{ workspace_name }}` is a read-only mount of this experiment setup.
-- `/results` is the only writable host-project output path.
-- Inspect project files using `read`, `grep`, `find`, and `ls`.
-- Use `run_experiment` with a shell `command` to inspect CLI help and execute
-  the experiment files the user names. Read source and try `--help` to discover
-  arguments; do not require a particular filename, seed flag, or CLI interface.
-- Commands start in a fresh run directory. Use absolute `/project/...` paths
-  for inputs and `$RUN_DIR` for outputs; change directory explicitly if needed.
-- Do not modify source, experiment runners, extension code, or configurations.
-- Pi and experiments share an outbound allowlist firewall: IPv4 HTTPS to
-  startup-resolved allowed hosts and DNS to configured IPv4 resolvers; external
-  IPv6 and other outbound traffic are blocked. You run as `node` without sudo
-  or firewall capabilities, after root startup installs the rules and drops
-  all capability bounding bits. Do not attempt to bypass or modify the firewall.
-- If a required provider or dataset host is blocked, report it to the user.
-  They must edit `.devcontainer/firewall-allowlist.txt` from the host or regular
-  development container and rebuild; the image uses a root-owned baked copy.
-  DNS address rotation requires a restart. Image builds are not filtered.
-- Metrics are optional: inspect stdout and artifacts when no `metrics.json`
-  is produced. For ranking, arrange a numeric JSON object at
-  `$RUN_DIR/metrics.json` only when supported by the evaluator.
-- Use `list_experiments` and `compare_experiments` to summarize previous runs.
-- Keep hypotheses, random seeds, acceptance rules, and conclusions explicit.
-- The bundled benchmark is only a smoke test; never infer training quality from it.
-- Avoid repeating experiments with identical inputs absent a measurement-noise reason.
-- Do not claim a new best result without checking correctness and comparable metrics.
-- A read-only mount limits writes, but the source tree may contain secrets.
-  Do not quote or transmit credentials found in project files.
-  An IP allowlist is not domain security or total isolation: shared IPs can
-  expose other services, and allowed services or DNS can exfiltrate data.
-  Commands can still read accessible credential files despite the reduced
-  environment.
+- `/project` contains only explicitly selected read-only source mounts, not the
+  whole parent repository. See the workspace README for exact target mappings;
+  with no selections, `/project` is empty. Selected directories expose descendants.
+- `/workspace/{{ workspace_name }}` is a read/write mount of this entire workspace;
+  changes propagate back to the host. Prefer its `results/` subdirectory for
+  experiment artifacts. It is not a separate mount; there is no top-level `/results`.
+- Use Pi's built-in `read`, `bash`, `edit`, and `write` tools. The user names the
+  experiment and goals in chat. Inspect source and CLI help to discover commands,
+  configuration, dependencies, and output conventions; do not require a particular
+  filename, CLI, seed flag, or metrics format. Choose output paths explicitly;
+  run directories, logs, metadata, and rankings are not generated automatically.
+- Container configuration supplies shared defaults:
+  `TRACKIO_DIR=/workspace/{{ workspace_name }}/trackio`,
+  `XDG_CACHE_HOME=/workspace/{{ workspace_name }}/results/.cache`,
+  `UV_CACHE_DIR=/workspace/{{ workspace_name }}/results/.cache/uv`,
+  `UV_PROJECT_ENVIRONMENT=/workspace/{{ workspace_name }}/results/.venv`,
+  `JAX_COMPILATION_CACHE_DIR=/workspace/{{ workspace_name }}/results/.cache/jax`,
+  `PYTHONPATH=/project:/project/src`, and `PYTHONDONTWRITEBYTECODE=1`.
+  The image sets `TMPDIR=/tmp`; these are not per-command overrides.
+  Model/thinking defaults are initialized in node's global Pi settings.
+- Selected source inputs cannot be edited through their read-only mounts.
+  Workspace experiments and configuration are writable; change setup only when
+  requested. The bundled benchmark is a source-counting smoke test, not a research
+  quality metric. Report results using the project's actual evidence.
+- Pi and Bash commands run as `node` without sudo or firewall capabilities.
+  Root startup installs an outbound allowlist and drops all capability bounding
+  bits. External access is IPv4 HTTPS to startup-resolved allowed hosts and DNS
+  to configured IPv4 resolvers; external IPv6 and other outbound traffic are
+  blocked. Do not attempt to bypass or modify the firewall.
+- If a required host is blocked, report it. The user must edit
+  `.devcontainer/firewall-allowlist.txt` from the host or regular development
+  container and rebuild; the active policy is a root-owned baked copy. DNS
+  address rotation requires a restart. Image builds are not filtered.
+- Bash inherits Pi's environment, including available credentials, and can read
+  accessible credential files or Pi state. Read-only mounts do not hide secrets.
+  Do not quote or transmit credentials. The IP allowlist is not domain security
+  or total isolation: shared IPs can expose other services, and permitted
+  services or DNS can exfiltrate data.

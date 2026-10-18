@@ -21,15 +21,15 @@ my-project/
     │   ├── Dockerfile
     │   ├── entrypoint.sh       # Root startup, then unprivileged node
     │   ├── init-firewall.py    # Fail-closed outbound firewall
+    │   ├── init-node.py        # Initialize node's Pi settings, then exec command
+    │   ├── pi-settings.json    # Model/thinking seed baked into the image
     │   └── firewall-allowlist.txt # Hosts resolved at container startup
-    ├── .pi/extensions/
-    │   └── experiments.ts      # Pi: run/list/compare tools
     ├── experiments/
-    │   ├── run.sh              # Logged shell-command execution entrypoint
     │   └── benchmark.py       # Optional executable smoke test
-    ├── results/               # Only host-project writable output path for Pi
-    ├── run-pi.sh              # Restricted Pi launcher
+    ├── results/               # Experiment outputs within the writable workspace
+    ├── run-pi.sh              # Launch Pi from the workspace
     ├── AGENTS.md              # Experiment instructions
+    ├── .autoresearch.json     # Saved explicit read-only selections
     └── README.md
 ```
 
@@ -57,73 +57,198 @@ uvx --from git+https://github.com/OWNER/autoresearch-base.git \
   configure-autoresearch --workspace ./autoresearch
 ```
 
-Run the last command **from the parent repository's root**. The destination
-folder can exist or be created by the generator, and must be an immediate child
-of the repository. The tool does not need to find or modify the parent's
-`.devcontainer/` directory.
+`--workspace` chooses the experiment folder; its parent must exist. The folder
+must be nonexistent, empty (with no hidden entries either), or an existing
+autoresearch workspace. Non-empty unrelated directories are rejected before
+the picker opens, even with `--force` or `--dry-run`. Existing workspaces are
+recognized by valid `.autoresearch.json` settings or their original generated
+launcher/devcontainer layout.
 
-Use `--dry-run` to inspect planned files. Rerunning preserves files whose
-contents match the templates. It refuses to overwrite edited files without
-`--force` (which replaces generated files).
+There is no immediate-child-of-repository requirement, and the parent's
+`.devcontainer/` is not modified.
+
+By default, setup opens an interactive file browser with saved selections
+prechecked. For a nonexistent or empty workspace, browsing starts in its
+parent; existing autoresearch workspaces start inside themselves. Choose only
+the files and directories experiments need—there is **no whole-parent mount
+by default**.
+
+For example, given `/host/project/math/` and `/host/project/pyproject.toml`:
+
+```bash
+configure-autoresearch --workspace /host/project/math-experiments
+```
+
+In the browser for a new workspace, use `ls`, `toggle math`, `toggle pyproject.toml`, then
+`selected` to review and `done` to confirm. Optionally select `uv.lock` too.
+The picker prints the exact host-to-container mapping:
+
+| Selected host path | Container path |
+|---|---|
+| `/host/project/math` | `/project/math` |
+| `/host/project/pyproject.toml` | `/project/pyproject.toml` |
+
+Browser commands are `ls`, `up`, `cd NAME/INDEX/PATH`, `toggle INDEX/PATH`,
+`select .` (select the current directory), `selected`, `done`, and `cancel`.
+Navigate down with `cd` and back up with `up`; toggle either files or directories.
+Enter a number list directly to toggle multiple entries: `1,3,5-8` selects
+entries 1, 3, and 5 through 8. `toggle 1,3,5-8` does the same;
+`select 1,3,5-8` only adds entries. Use no spaces within number lists.
+Repeated or overlapping indices count once; invalid or out-of-range batches
+leave the selection unchanged.
+Selecting a directory exposes **all its descendants**, including secrets.
+Symlinks resolve to their canonical sources; duplicate and covered selections
+collapse. Selections outside the workspace's parent are supported, but shift
+the common ancestor used for `/project` targets: review the displayed mapping.
+Selecting nothing leaves `/project` empty.
+
+Successful generation saves canonical, workspace-relative selections in
+`.autoresearch.json`, keeping sibling paths portable when the tree moves.
+To bypass the picker, repeat `--read-only PATH`; relative paths are resolved
+against the **workspace**, not the shell's working directory, and override the
+saved list:
+
+```bash
+configure-autoresearch --workspace /host/project/math-experiments \
+  --read-only ../math --read-only ../pyproject.toml
+configure-autoresearch --workspace /host/project/math-experiments --non-interactive
+```
+
+`--non-interactive` uses saved selections and requires a saved configuration
+unless explicit `--read-only` choices are supplied. Cancellation writes nothing;
+no setup files or selections are written until successful generation.
+`--dry-run` previews without writing, including settings. Rerunning preserves
+matching generated files and refuses to overwrite changed generated files
+without `--force`; this also applies when changing saved selections.
+
+Regeneration removes obsolete `experiments/run.sh`,
+`.pi/extensions/research-tools.ts`, and `.pi/extensions/experiments.ts` only
+with `--force`. Review local edits before forcing removal. Symlinks at these
+paths are rejected, even with `--force`; remove them yourself after review.
+Experiments now run through Pi's built-in Bash tool.
+
+Regeneration removes the obsolete project `.pi/settings.json` only when it still
+matches the old generated defaults. Review a modified old file and migrate any
+desired choices to node's `~/.pi/agent/settings.json`; removal requires `--force`.
+No project settings file is generated in the new layout.
 
 ## Next steps
 
+The generated image includes `fd`, zsh, and Oh My Zsh. Both the `node` account
+and VS Code's default terminal use zsh. Image defaults provide `HOME=/home/node`
+and `SHELL=/bin/zsh`, including for `docker exec --user node`. The root firewall
+entrypoint explicitly sets `HOME=/root` and `SHELL=/bin/bash` for startup only.
+Oh My Zsh is installed/configured as node; root does not source node's shell setup.
+Automatic Oh My Zsh updates are disabled.
+Regenerate existing workspaces (review local edits before `--force`), rebuild
+the container, and open a new terminal to apply shell changes.
+Do not change the final Dockerfile `USER root`: the entrypoint needs root to
+install the firewall, then drops to `node` with the correct home and no capabilities.
+VS Code uses `remoteUser: node`. A plain `docker exec` otherwise defaults to root;
+for a node shell use `docker exec --user node -it CONTAINER /bin/zsh -l`.
+Docker executes the specified command; `SHELL` does not replace an explicit `bash`.
+For direct root access, explicitly override the node environment:
+`docker exec --user root --env HOME=/root --env SHELL=/bin/bash --env USER=root --env LOGNAME=root -it CONTAINER /bin/bash -l`.
+Rebuild/recreate to discard completion caches created under the wrong identity;
+do not disable Oh My Zsh's completion security checks.
+
 1. Open `my-project/autoresearch` **as its own folder** in Visual Studio Code.
 2. Choose **Dev Containers: Reopen in Container**. This builds a separate image.
-3. Verify that `/project` and `/workspace/autoresearch` are read-only, while
-   `/results` is writable (instructions in generated `README.md`).
+3. Verify that selected source mounts are read-only and `/workspace/autoresearch`
+   and its `results/` subdirectory are writable (instructions in generated `README.md`).
 4. Run the bundled smoke test:
 
    ```bash
-   mkdir -p /results/manual-smoke
-   bash experiments/run.sh /results/manual-smoke 'python3 /workspace/autoresearch/experiments/benchmark.py --project /project --output "$RUN_DIR" --seed 42'
-   cat /results/manual-smoke/metrics.json
+   mkdir -p /workspace/autoresearch/results/manual-smoke
+   python3 /workspace/autoresearch/experiments/benchmark.py --project /project --output /workspace/autoresearch/results/manual-smoke --seed 42
+   cat /workspace/autoresearch/results/manual-smoke/metrics.json
    ```
 
-5. Configure Pi authentication and start `./run-pi.sh`. The custom Pi extension
-   provides `run_experiment`, `list_experiments`, and `compare_experiments`.
-6. Tell Pi which experiment file to use, for example: “Use `/project/experiment.py`;
-   inspect its `--help` and run a small experiment.” No runner edits or prescribed
-   CLI are needed. Customize the container runtime for your project's dependencies.
+5. Authenticate Pi with OpenAI Codex in a node shell, then start `./run-pi.sh`.
+   After the root firewall setup, `setpriv` drops to node with no capabilities;
+   `.devcontainer/init-node.py` initializes node's global
+   `~/.pi/agent/settings.json` before executing the container command.
+   A new user receives provider `openai-codex`, model `gpt-6.1-sol`, and `medium`
+   thinking. The model must be available in your installed Pi/provider catalog
+   and account; these defaults do not add it to the catalog.
+   Existing settings and `auth.json` are preserved: the provider/model pair is
+   seeded only if neither key exists, and thinking is filled only when missing.
+   Malformed existing settings stop startup rather than being overwritten.
+   Root's Pi settings are untouched. Pi uses its default built-in tools:
+   `read`, `bash`, `edit`, and `write`.
+6. Tell Pi the experiment file and goals in chat, for example: “Use
+   `/project/experiment.py`; inspect its source and `--help`, discover its
+   configuration and output conventions, and run a small experiment.”
+   No prescribed CLI or metrics format is needed. Customize the container
+   runtime for your project's dependencies.
+
+The seed `.devcontainer/pi-settings.json` is editable from the host/development
+container and baked with `init-node.py` into root-owned
+`/usr/local/lib/autoresearch/`; rebuild to apply seed changes. Startup fills
+missing defaults, not existing user choices. To change active choices, edit
+`~/.pi/agent/settings.json` or use Pi's `/settings` **inside a node shell**.
+The `/home/node/.pi` volume persists settings, authentication, and sessions across
+rebuilds. Model defaults do not require a project extension or project settings.
 
 ## Isolation boundaries
 
 | Container path | Permissions | Purpose |
 |---|---|---|
-| `/project` | **Read-only bind mount** | Complete parent repository |
-| `/workspace/autoresearch` | **Read-only bind mount** | Scripts, prompts, Pi extension |
-| `/results` | **Read/write bind mount** | Host `autoresearch/results/` |
+| Selected paths under `/project` | **Read-only bind mounts** | Only explicitly selected files/directories |
+| `/workspace/autoresearch` | **Read/write bind mount** | Entire host workspace: scripts, prompts, and results |
+| `/workspace/autoresearch/results` | Writable subdirectory, not a separate mount | Host `autoresearch/results/` |
 | `/home/node/.pi` | Persistent named volume | Pi authentication/settings/sessions |
 
-The parent project is mounted from `${localWorkspaceFolder}/..`, so the folder
-opened by Dev Containers must be `my-project/autoresearch`, not `my-project`.
-The same physical `results` folder is reachable read-only via `/project` and
-writable via `/results`. This is intentional.
+Open the generated workspace itself in Dev Containers, not its parent. Source
+mounts use portable workspace-relative paths from `.autoresearch.json`; the
+generated README lists their exact targets. `/project` is only a root-owned
+mount-parent scaffold when nothing is selected. Unselected parent files are
+not exposed. The entire workspace is mounted read/write, including its normal
+`results/` subdirectory; there is no top-level `/results` directory or mount.
+If a broad selected directory also contains the workspace, that read-only alias
+does not prevent writes through `/workspace/autoresearch`.
 
-The Pi launcher exposes file-browsing tools (`read`, `grep`, `find`, `ls`) and
-the three custom experiment tools, with `--no-mcp` and an explicit extension
-load. It does not expose Pi's built-in `bash`, `edit`, or `write` tools, but
-`run_experiment` accepts arbitrary shell commands, including CLI `--help`.
-This is general shell execution with logging, not a read-only tool boundary.
-Commands start in a fresh `/results/<uuid>` directory, with `$RUN_DIR` exported
-for output paths. Command text, timing, exit status, and logs are recorded.
-`metrics.json` is optional; numeric metrics enable `compare_experiments`.
+`TRACKIO_DIR` defaults to `/workspace/<workspace-folder-name>/trackio`, including for
+Pi-launched experiments. For `--workspace experiments/`, Trackio stores local
+project databases in `/workspace/experiments/trackio`, shared across runs.
+Launch the dashboard in the same container to use that default. An explicit
+`TRACKIO_DIR` override is preserved. Trackio must be installed in your runtime.
 
-The experiment process receives a reduced environment that omits model API
-credentials, and runs with a timeout. Project source and runner mounts are
-read-only. Docker drops all capabilities except `NET_ADMIN`, `SETUID`, `SETGID`,
+`run-pi.sh` changes to `/workspace/autoresearch` and executes `pi "$@"`.
+It does not restrict tools or load a custom extension. Pi's default tools are
+`read`, `bash`, `edit`, and `write`; Bash executes ordinary shell commands with
+the container user's permissions and inherits Pi's environment, including any
+credentials available there.
+
+The container configuration supplies shared defaults:
+`XDG_CACHE_HOME=/workspace/autoresearch/results/.cache`,
+`UV_CACHE_DIR=/workspace/autoresearch/results/.cache/uv`,
+`UV_PROJECT_ENVIRONMENT=/workspace/autoresearch/results/.venv`, and
+`JAX_COMPILATION_CACHE_DIR=/workspace/autoresearch/results/.cache/jax`.
+`PYTHONPATH=/project:/project/src` and `PYTHONDONTWRITEBYTECODE=1` support imports
+without writing bytecode to source mounts; the image sets `TMPDIR=/tmp`.
+These are container defaults, not per-command overrides.
+
+Use `results/` as the recommended output folder and discover the project's
+commands, configuration, and artifact conventions through chat and inspection.
+There are no automatic run directories, logs, metadata records, or rankings;
+choose output paths and record any experiment evidence explicitly.
+
+Only selected source inputs under `/project` are read-only; the workspace is
+writable. Docker drops all capabilities except `NET_ADMIN`, `SETUID`, `SETGID`,
 and `SETPCAP` needed by the root startup entrypoint. It installs the firewall,
 then runs the container command as `node` with all capability bounding bits
 dropped. Pi and experiment commands have no firewall capabilities or sudo.
 No-new-privileges and a PID limit remain enabled; no Docker socket is mounted.
-Container writable layers and Pi's persistent state still exist; only the
-results mount writes back into the repository.
+Container writable layers and Pi's persistent state still exist. Writes anywhere
+in the mounted workspace, not just `results/`, propagate back to the host.
 
-**Security caveats:** a read-only mount does not hide secrets in the repository,
-and model-selected commands can still use allowed network services, read Pi's
-persistent credentials, or write to container-private storage. A reduced
-environment is not credential isolation. This is a practical source-protection
-model, not a hostile-code sandbox. Do not expose sensitive credentials to commands.
+**Security caveats:** a read-only mount does not hide secrets in the repository.
+Model-selected Bash commands inherit Pi's environment, including credentials,
+and can use allowed network services, read Pi's persistent credentials, modify
+workspace files on the host, or write to container-private storage.
+This protects selected source mounts, not the workspace, and is not a hostile-code
+sandbox. Do not expose sensitive credentials to commands.
 GPU access is not enabled.
 
 ## Outbound firewall
@@ -157,8 +282,8 @@ This is an IP allowlist, not domain-level security or total network isolation:
 shared IPs can expose other services, permitted services can receive exfiltrated
 data, and allowed DNS can carry exfiltration. Only IPv4 HTTPS is supported
 externally; DNS address rotation requires a container restart to resolve again.
-Image builds are not filtered by this runtime firewall. Commands can still read
-accessible credential files; do not treat reduced environments as secret isolation.
+Image builds are not filtered by this runtime firewall. Commands inherit Pi's
+environment and can read accessible credential files; neither is secret isolation.
 
 For manual checks inside the Pi container, use `curl` if available:
 
@@ -178,7 +303,7 @@ The generated benchmark counts Python source files for a zero-dependency smoke
 test. It is **not** a research metric. Real experiments should:
 
 - use immutable evaluation data, fixed budgets, and correctness gates;
-- direct temporary files, caches, checkpoints, logs, and plots to `/results`;
+- use `/workspace/autoresearch/results` for experiment artifacts; shared cache and environment defaults are configured separately;
 - record seeds, metrics, code revision, package versions, and hardware details;
 - replicate promising runs to quantify measurement noise;
 - reserve held-out validation for finalists rather than optimize directly on it.
@@ -187,7 +312,7 @@ If your main devcontainer has specialized dependencies, extend the generated
 Pi Dockerfile with the same toolchain, or use the same runtime base image as
 your main development container. The two containers do **not** automatically
 share installed packages or Python virtual environments. `UV_CACHE_DIR` and
-`UV_PROJECT_ENVIRONMENT` are set to writable locations under `/results`.
+`UV_PROJECT_ENVIRONMENT` are set to writable locations under `/workspace/autoresearch/results`.
 
 ## Working on the generator
 
@@ -203,6 +328,5 @@ Templates are included in the installed Python package.
 ## Upstream references
 
 - [devcontainer-base](https://github.com/mattfeng/devcontainer-base)
-- [Pi extension reference](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/extensions.md)
 - [Pi command-line options](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/cli.md)
 - [Dev Container metadata reference](https://containers.dev/implementors/json_reference/)

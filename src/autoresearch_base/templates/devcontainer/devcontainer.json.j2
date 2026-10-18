@@ -1,24 +1,40 @@
 {
-  "name": "Pi autoresearch: {{ workspace_name }}",
+  "name": {{ ("Pi autoresearch: " ~ workspace_name) | tojson }},
   "build": {
     "dockerfile": "Dockerfile"
   },
   "remoteUser": "node",
   "overrideCommand": false,
   "updateRemoteUserUID": true,
-  "workspaceFolder": "/workspace/{{ workspace_name }}",
-  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace/{{ workspace_name }},type=bind,readonly",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "zsh",
+        "terminal.integrated.profiles.linux": {
+          "zsh": {
+            "path": "/bin/zsh",
+            "args": ["-l"]
+          }
+        }
+      }
+    }
+  },
+  "workspaceFolder": {{ ("/workspace/" ~ workspace_name) | tojson }},
+  "workspaceMount": {{ ("source=${localWorkspaceFolder},target=/workspace/" ~ workspace_name ~ ",type=bind") | tojson }},
   "mounts": [
-    "source=${localWorkspaceFolder}/..,target=/project,type=bind,readonly",
-    "source=${localWorkspaceFolder}/results,target=/results,type=bind",
-    "source={{ volume_name }},target=/home/node/.pi,type=volume"
+{% for mount in read_only_mounts %}
+    {{ ("source=${localWorkspaceFolder}/" ~ mount.relative_source ~ ",target=" ~ mount.target ~ ",type=bind,readonly") | tojson }},
+{% endfor %}
+    {{ ("source=" ~ volume_name ~ ",target=/home/node/.pi,type=volume") | tojson }}
   ],
   "containerEnv": {
     "PYTHONPATH": "/project:/project/src",
     "PYTHONDONTWRITEBYTECODE": "1",
-    "XDG_CACHE_HOME": "/results/.cache",
-    "UV_CACHE_DIR": "/results/.cache/uv",
-    "UV_PROJECT_ENVIRONMENT": "/results/.venv"
+    "TRACKIO_DIR": {{ ("/workspace/" ~ workspace_name ~ "/trackio") | tojson }},
+    "XDG_CACHE_HOME": {{ ("/workspace/" ~ workspace_name ~ "/results/.cache") | tojson }},
+    "UV_CACHE_DIR": {{ ("/workspace/" ~ workspace_name ~ "/results/.cache/uv") | tojson }},
+    "JAX_COMPILATION_CACHE_DIR": {{ ("/workspace/" ~ workspace_name ~ "/results/.cache/jax") | tojson }},
+    "UV_PROJECT_ENVIRONMENT": {{ ("/workspace/" ~ workspace_name ~ "/results/.venv") | tojson }}
   },
   "runArgs": [
     "--cap-drop=ALL",
