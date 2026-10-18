@@ -13,13 +13,17 @@ def test_only_group_restricted_character_devices_require_membership():
     modes = [
         (stat.S_IFCHR | 0o660, 1002),
         (stat.S_IFCHR | 0o660, 44),
+        (stat.S_IFCHR | 0o640, 1003),
+        (stat.S_IFCHR | 0o620, 1004),
+        (stat.S_IFCHR | 0o664, 1005),
+        (stat.S_IFCHR | 0o644, 1006),
         (stat.S_IFCHR | 0o666, 0),
         (stat.S_IFDIR | 0o750, 0),
         (stat.S_IFREG | 0o660, 99),
     ]
     devices = [SimpleNamespace(stat=lambda mode=mode, gid=gid: SimpleNamespace(st_mode=mode, st_gid=gid)) for mode, gid in modes]
     dev = SimpleNamespace(glob=lambda pattern: devices)
-    assert helper["device_group_ids"](dev) == {44, 1002}
+    assert helper["device_group_ids"](dev) == {44, 1002, 1003, 1004, 1005}
 
 
 def test_membership_reuses_numeric_gid_preserves_members_and_is_idempotent(tmp_path):

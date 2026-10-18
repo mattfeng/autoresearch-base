@@ -175,8 +175,8 @@ or CUDA. Scientific workloads may also need user-provided CUDA-enabled runtime
 dependencies in the Dockerfile or Python environment.
 
 Before dropping privileges, root startup detects the numeric GIDs of top-level
-NVIDIA character devices that allow group read/write access but not world
-read/write access. It adds `node` to the corresponding in-container groups.
+NVIDIA character devices where group membership grants additional read or write
+access. It adds `node` to those groups, including read-only or write-only groups.
 This survives `setpriv --init-groups` and applies to new VS Code terminals;
 no host-specific GID is hardcoded. Device modes and capability restrictions
 remain unchanged. Regenerate, rebuild, and recreate older containers to apply

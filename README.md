@@ -195,10 +195,10 @@ The `/home/node/.pi` volume persists settings, authentication, and sessions acro
 rebuilds. Model defaults do not require a project extension or project settings.
 
 Root startup also runs `.devcontainer/init-gpu.py` before dropping privileges.
-It detects numeric GIDs of top-level NVIDIA character devices that grant group
-read/write access but not world read/write access, and adds `node` to those
-in-container groups. No host-specific GID is hardcoded. Membership survives
-`setpriv --init-groups` and applies to new VS Code terminals. Capability restrictions
+It detects numeric GIDs of top-level NVIDIA character devices where group membership
+grants additional read or write access, and adds `node` to those in-container
+groups. Read-only and write-only group permissions are supported; no GID is hardcoded.
+Membership survives `setpriv --init-groups` and applies to new VS Code terminals. Capability restrictions
 remain unchanged; no privileged mode or device permission changes are needed.
 Regenerate, rebuild, and recreate existing containers to apply this fix.
 
