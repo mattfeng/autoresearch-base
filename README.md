@@ -212,7 +212,7 @@ credentials available there.
 The container configuration supplies shared defaults:
 `XDG_CACHE_HOME=/workspace/autoresearch/results/.cache`,
 `UV_CACHE_DIR=/workspace/autoresearch/results/.cache/uv`,
-`UV_PROJECT_ENVIRONMENT=/workspace/autoresearch/results/.venv`, and
+`UV_PROJECT_ENVIRONMENT=/tmp/autoresearch/.venv`, and
 `JAX_COMPILATION_CACHE_DIR=/workspace/autoresearch/results/.cache/jax`.
 `PYTHONPATH=/project:/project/src` and `PYTHONDONTWRITEBYTECODE=1` support imports
 without writing bytecode to source mounts; the image sets `TMPDIR=/tmp`.
@@ -299,8 +299,12 @@ For scientific experiments:
 If your main devcontainer has specialized dependencies, extend the generated
 Pi Dockerfile with the same toolchain, or use the same runtime base image as
 your main development container. The two containers do **not** automatically
-share installed packages or Python virtual environments. `UV_CACHE_DIR` and
-`UV_PROJECT_ENVIRONMENT` are set to writable locations under `/workspace/autoresearch/results`.
+share installed packages or Python virtual environments. `uv run` and `uv sync`
+use `/tmp/<workspace-folder-name>/.venv` by default; this environment is temporary
+and can be recreated after container replacement or `/tmp` cleanup.
+For standalone creation, use `uv venv "$UV_PROJECT_ENVIRONMENT"`; plain
+`uv venv` does not use `UV_PROJECT_ENVIRONMENT`. The uv cache stays under
+`/workspace/<workspace-folder-name>/results/.cache/uv`.
 
 ## Working on the generator
 

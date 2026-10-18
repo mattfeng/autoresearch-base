@@ -205,7 +205,7 @@ The Dockerfile and devcontainer configuration supply shared defaults:
 | `TRACKIO_DIR` | `/workspace/{{ workspace_name }}/trackio` |
 | `XDG_CACHE_HOME` | `/workspace/{{ workspace_name }}/results/.cache` |
 | `UV_CACHE_DIR` | `/workspace/{{ workspace_name }}/results/.cache/uv` |
-| `UV_PROJECT_ENVIRONMENT` | `/workspace/{{ workspace_name }}/results/.venv` |
+| `UV_PROJECT_ENVIRONMENT` | `/tmp/{{ workspace_name }}/.venv` |
 | `JAX_COMPILATION_CACHE_DIR` | `/workspace/{{ workspace_name }}/results/.cache/jax` |
 | `PYTHONPATH` | `/project:/project/src` |
 | `PYTHONDONTWRITEBYTECODE` | `1` |
@@ -223,10 +223,12 @@ name them in chat; no prescribed filename or CLI is required. This experiment
 container cannot edit selected source mounts, but it can edit its writable
 workspace setup. Rebuild the container when you change its Dockerfile.
 
-For project dependencies, create a runtime environment in
-`/workspace/{{ workspace_name }}/results/.venv`, not `/project/.venv`.
-`UV_PROJECT_ENVIRONMENT` and `UV_CACHE_DIR` are already set under
-`/workspace/{{ workspace_name }}/results`. To match complex scientific dependencies, modify the Pi
+`uv run` and `uv sync` create/use `/tmp/{{ workspace_name }}/.venv` by default,
+not `/project/.venv`. This environment is temporary and can be recreated after
+container replacement or `/tmp` cleanup. For standalone creation, use
+`uv venv "$UV_PROJECT_ENVIRONMENT"`; plain `uv venv` does not use that variable.
+`UV_CACHE_DIR` remains under `/workspace/{{ workspace_name }}/results/.cache/uv`.
+To match complex scientific dependencies, modify the Pi
 Dockerfile or base it on the same runtime image as your development container.
 GPU access is not enabled; configure it deliberately if required.
 

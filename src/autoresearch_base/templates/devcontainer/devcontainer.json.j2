@@ -34,7 +34,7 @@
     "XDG_CACHE_HOME": {{ ("/workspace/" ~ workspace_name ~ "/results/.cache") | tojson }},
     "UV_CACHE_DIR": {{ ("/workspace/" ~ workspace_name ~ "/results/.cache/uv") | tojson }},
     "JAX_COMPILATION_CACHE_DIR": {{ ("/workspace/" ~ workspace_name ~ "/results/.cache/jax") | tojson }},
-    "UV_PROJECT_ENVIRONMENT": {{ ("/workspace/" ~ workspace_name ~ "/results/.venv") | tojson }}
+    "UV_PROJECT_ENVIRONMENT": {{ ("/tmp/" ~ workspace_name ~ "/.venv") | tojson }}
   },
   "runArgs": [
     "--cap-drop=ALL",

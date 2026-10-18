@@ -15,7 +15,7 @@
   `TRACKIO_DIR=/workspace/{{ workspace_name }}/trackio`,
   `XDG_CACHE_HOME=/workspace/{{ workspace_name }}/results/.cache`,
   `UV_CACHE_DIR=/workspace/{{ workspace_name }}/results/.cache/uv`,
-  `UV_PROJECT_ENVIRONMENT=/workspace/{{ workspace_name }}/results/.venv`,
+  `UV_PROJECT_ENVIRONMENT=/tmp/{{ workspace_name }}/.venv`,
   `JAX_COMPILATION_CACHE_DIR=/workspace/{{ workspace_name }}/results/.cache/jax`,
   `PYTHONPATH=/project:/project/src`, and `PYTHONDONTWRITEBYTECODE=1`.
   The image sets `TMPDIR=/tmp`; these are not per-command overrides.

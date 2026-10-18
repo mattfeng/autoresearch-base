@@ -72,7 +72,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     TRACKIO_DIR=/workspace/{{ workspace_name }}/trackio \
     XDG_CACHE_HOME=/workspace/{{ workspace_name }}/results/.cache \
     UV_CACHE_DIR=/workspace/{{ workspace_name }}/results/.cache/uv \
-    UV_PROJECT_ENVIRONMENT=/workspace/{{ workspace_name }}/results/.venv \
+    UV_PROJECT_ENVIRONMENT=/tmp/{{ workspace_name }}/.venv \
     JAX_COMPILATION_CACHE_DIR=/workspace/{{ workspace_name }}/results/.cache/jax \
     TMPDIR=/tmp
 
